@@ -4,7 +4,7 @@ library(raster)
 library(rgdal)
 library(fasterize)
 library(rgdal)
-
+library(lubridate)
 
 ## ouverture des données de localisation des pièges
 pieges <- st_read("localisation_piege_provisoire.gpkg")
@@ -44,7 +44,7 @@ for(i in 1:length(mns)){
 gdalUtils::gdalwarp(srcfile=mns_to_keep,dstfile="data/processed_data/mns.tif", overwrite = T)
 
 
-mnt <- list.files("data/RGEALTI_2-0_5M_ASC_LAMB93-IGN69_D034_2022-12-16/RGEALTI/1_DONNEES_LIVRAISON_2023-01-00223/RGEALTI_MNT_5M_ASC_LAMB93_IGN69_D034", full.names = T) %>% lapply(raster)
+mnt <- list.files("data/mnt_1m", full.names = T) %>% lapply(raster)
 mnt_to_keep <- NULL
 for(i in 1:length(mnt)){
   crs(mnt[[i]]) <- "+proj=lcc +lat_1=49 +lat_2=44 +lat_0=46.5 +lon_0=3 +x_0=700000 +y_0=6600000 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs" 
@@ -53,7 +53,6 @@ for(i in 1:length(mnt)){
   }
 }
 gdalUtils::gdalwarp(srcfile=mnt_to_keep,dstfile="data/processed_data/mnt.tif", t_srs = "EPSG:2154", overwrite = T)
-
 
 occ_sol <- occ_sol %>% st_crop(st_transform(roi,st_crs(occ_sol))) %>% st_cast("MULTIPOLYGON")
 pop <- pop %>% st_crop(st_transform(roi,st_crs(pop)))
@@ -70,22 +69,36 @@ write_sf(filosofi,"data/processed_data/filosofi.gpkg")
 write_sf(bati,"data/processed_data/bati.gpkg")
 write_sf(lcz,"data/processed_data/lcz.gpkg")
 
-## conversion des données vectorielles en raster pour calcul métrique paysagères
-# vegetation
+### conversion des données vectorielles en raster pour calcul métrique paysagères
+## vegetation
 r <- raster(vegetation, res = 1, crs = '+proj=lcc +lat_1=49 +lat_2=44 +lat_0=46.5 +lon_0=3 +x_0=700000 +y_0=6600000 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs')
 vegetation_rast <- fasterize(vegetation, r, field="COD_VEG_n", background = 0)
 vegetation_rast <- crop(vegetation_rast, st_transform(roi,crs(vegetation_rast)))
 
 writeRaster(vegetation_rast,"data/processed_data/vegetation.tif")
 
-# occupation du sol
+# raster attribute table
+vegetation_data_dic <- st_drop_geometry(vegetation) %>% mutate_if(is.factor, as.character)
+vegetation_data_dic <- unique(vegetation_data_dic[c("COD_VEG_n", "LIB_VEG_n")])
+colnames(vegetation_data_dic) <- c("class","label")
+vegetation_data_dic <- rbind(vegetation_data_dic,c(0,"Surface non végétalisée"))
+write.csv(vegetation_data_dic,"data/processed_data/vegetation_data_dic.csv", row.names = F)
+
+
+## occupation du sol
 r <- raster(occ_sol, res = 1, crs = '+proj=laea +lat_0=52 +lon_0=10 +x_0=4321000 +y_0=3210000 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs')
 occ_sol$code_2018=as.numeric(as.character(occ_sol$code_2018))
 occ_sol_rast <- fasterize(occ_sol, r, field="code_2018")
 
 writeRaster(occ_sol_rast,"data/processed_data/occ_sol.tif")
 
-# modèle numérique d'élévation
+# raster attribute table
+occ_sol_data_dic <- st_drop_geometry(occ_sol) %>% mutate_if(is.factor, as.character)
+occ_sol_data_dic <- unique(occ_sol_data_dic[c("code_2018", "class_2018")])
+colnames(occ_sol_data_dic) <- c("class","label")
+write.csv(occ_sol_data_dic,"data/processed_data/occ_sol_data_dic.csv",row.names = F)
+
+## modèle numérique d'élévation
 
 mnt <- terra::rast("data/processed_data/mnt.tif")
 mns <- terra::rast("data/processed_data/mns.tif")
@@ -109,3 +122,15 @@ vegetation_rast2[vegetation_rast2 == 0] <- NA
 mne_veget <- terra::mask(mne,vegetation_rast2)
 
 terra::writeRaster(mne_veget,"data/processed_data/mne_veget.tif", overwrite = T)
+
+
+## données météo
+df_meteo <- list.files("data/METEO_SYNOP", full.names = T) %>%
+  purrr::map_dfr(.,~read.csv(., sep = ";", stringsAsFactors = F, na.strings = "mq")) %>%
+  filter(numer_sta == 07643) %>% # code station meteo montpellier
+  mutate(date = parse_date_time(date,"ymdHMS")) %>%
+  mutate(jour = as_date(date))
+
+
+write.csv(df_meteo,"data/processed_data/meteo_macro.csv",row.names = F)
+
