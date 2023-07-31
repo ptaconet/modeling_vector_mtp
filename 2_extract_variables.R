@@ -213,7 +213,8 @@ df_lsm_vegetation <- df_lsm_vegetation %>%
   left_join(metrics_defs) %>%
   dplyr::select(-c(level,metric,name,type)) %>%
   pivot_wider(names_from = c(function_name,layer_id,buffer,pixval), values_from = val, names_sep = "_", values_fill = list(val = 0)) %>%
-  mutate_all(funs(replace_na(.,0)))
+  mutate_all(funs(replace_na(.,0))) %>%
+  mutate(ID_PIEGE = as.character(ID_PIEGE))
 
 
 df_lsm_occsol <- df_lsm_occsol %>%
@@ -226,42 +227,58 @@ df_lsm_occsol <- df_lsm_occsol %>%
   left_join(metrics_defs) %>%
   dplyr::select(-c(level,metric,name,type)) %>%
   pivot_wider(names_from = c(function_name,layer_id,buffer,pixval), values_from = val, names_sep = "_", values_fill = list(val = 0)) %>%
-  mutate_all(funs(replace_na(.,0)))
+  mutate_all(funs(replace_na(.,0))) %>%
+  mutate(ID_PIEGE = as.character(ID_PIEGE))
 
 
 IMP <- IMP %>%
   mutate(buffer = as.numeric(buffer)) %>%
-  pivot_wider(names_from = buffer, values_from = -c(buffer,ID_PIEGE), names_glue = "IMP_{buffer}_{.value}",)#, values_fill = list(val = 0))  
+  pivot_wider(names_from = buffer, values_from = -c(buffer,ID_PIEGE), names_glue = "IMP_{buffer}_{.value}") %>%#, values_fill = list(val = 0))  
+  mutate(ID_PIEGE = as.character(ID_PIEGE))
 
 IMP2 <- IMP2 %>% 
-  rename(IMP_0 = impermeabilite)
+  rename(IMP_0 = impermeabilite) %>%
+  mutate(ID_PIEGE = as.character(ID_PIEGE))
 
 HVG <- HVG %>%
   mutate(buffer = as.numeric(buffer)) %>%
-  pivot_wider(names_from = buffer, values_from = -c(buffer,ID_PIEGE), names_glue = "HVG_{buffer}_{.value}",)#, values_fill = list(val = 0))  
+  pivot_wider(names_from = buffer, values_from = -c(buffer,ID_PIEGE), names_glue = "HVG_{buffer}_{.value}") %>%#, values_fill = list(val = 0))  
+  mutate(ID_PIEGE = as.character(ID_PIEGE))
 
 HVG2 <- HVG2 %>% 
-  rename(HVG_0 = mns)
+  rename(HVG_0 = mns) %>%
+  mutate(ID_PIEGE = as.character(ID_PIEGE))
 
 MNE <- MNE %>%
   mutate(buffer = as.numeric(buffer)) %>%
-  pivot_wider(names_from = buffer, values_from = -c(buffer,ID_PIEGE), names_glue = "ELE_{buffer}_{.value}",)#, values_fill = list(val = 0))  
+  pivot_wider(names_from = buffer, values_from = -c(buffer,ID_PIEGE), names_glue = "ELE_{buffer}_{.value}") %>%#, values_fill = list(val = 0))  
+  mutate(ID_PIEGE = as.character(ID_PIEGE))
 
-# LCZ = LCZ
-# df_filosofi = sf_filosofi
-# df_dist = df_dist
+LCZ = LCZ %>%
+  mutate(ID_PIEGE = as.character(ID_PIEGE))
+ 
+df_filosofi = df_filosofi %>%
+   mutate(ID_PIEGE = as.character(ID_PIEGE)) %>%
+  dplyr::select(-c("ZONE", "TYPE_PIEGE", "LATITUDE", "LONGITUDE"))
+ 
+df_dist = df_dist %>%
+   mutate(ID_PIEGE = as.character(ID_PIEGE))
+ 
 
 df_hauteur_bati <- df_hauteur_bati %>%
   mutate(buffer = as.numeric(buffer)) %>%
-  pivot_wider(names_from = buffer, values_from = -c(buffer,ID_PIEGE), names_glue = "BAT_{buffer}_{.value}",)#, values_fill = list(val = 0))  
+  pivot_wider(names_from = buffer, values_from = -c(buffer,ID_PIEGE), names_glue = "BAT_{buffer}_{.value}") %>%#, values_fill = list(val = 0))  
+  mutate(ID_PIEGE = as.character(ID_PIEGE))
 
 df_surf_bati <- df_surf_bati %>%
   mutate(buffer = as.numeric(buffer)) %>%
-  pivot_wider(names_from = buffer, values_from = -c(buffer,ID_PIEGE), names_glue = "BAT_{buffer}_{.value}",)#, values_fill = list(val = 0))  
+  pivot_wider(names_from = buffer, values_from = -c(buffer,ID_PIEGE), names_glue = "BAT_{buffer}_{.value}") %>%#, values_fill = list(val = 0))  
+  mutate(ID_PIEGE = as.character(ID_PIEGE))
 
 POP <- POP %>%
   mutate(buffer = as.numeric(buffer)) %>%
-  pivot_wider(names_from = buffer, values_from = -c(buffer,ID_PIEGE), names_glue = "POP_{buffer}_{.value}",)#, values_fill = list(val = 0))  
+  pivot_wider(names_from = buffer, values_from = -c(buffer,ID_PIEGE), names_glue = "POP_{buffer}_{.value}") %>%#, values_fill = list(val = 0))  
+  mutate(ID_PIEGE = as.character(ID_PIEGE))
 
 df_meteo_pieges <- df_meteo_pieges %>% 
   left_join(meteo) %>%
@@ -270,6 +287,21 @@ df_meteo_pieges <- df_meteo_pieges %>%
   left_join(df_releves_pieges) %>%
   relocate(ID_PIEGE, DATE_COLLECTE, .after = ID_COLLECTE)
   
-  
+
 # join all data to create 1 big dataset
 
+df_model <- df_meteo_pieges %>%
+  left_join(df_lsm_vegetation) %>%
+  left_join(df_lsm_occsol) %>%
+  left_join(IMP) %>%
+  left_join(IMP2) %>%
+  left_join(HVG) %>%
+  left_join(HVG2) %>%
+  left_join(MNE) %>%
+  left_join(LCZ) %>%
+  left_join(df_filosofi) %>%
+  left_join(df_dist) %>%
+  left_join(df_hauteur_bati) %>%
+  left_join(df_surf_bati) %>%
+  left_join(POP)
+  
