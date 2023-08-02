@@ -54,13 +54,14 @@ for(i in 1:length(mnt)){
 }
 gdalUtils::gdalwarp(srcfile=mnt_to_keep,dstfile="data/processed_data/mnt.tif", t_srs = "EPSG:2154", overwrite = T)
 
+vegetation <- vegetation %>% st_make_valid() %>% st_crop(st_transform(roi,st_crs(vegetation))) %>% st_cast("POLYGON")
 occ_sol <- occ_sol %>% st_crop(st_transform(roi,st_crs(occ_sol))) %>% st_cast("MULTIPOLYGON")
 pop <- pop %>% st_crop(st_transform(roi,st_crs(pop)))
 filosofi <- filosofi %>% st_crop(st_transform(roi,st_crs(filosofi))) %>% st_cast("MULTIPOLYGON")
 impermeabilite <- impermeabilite %>% crop(st_transform(roi,crs(impermeabilite))) 
 temp_diurne <- temp_diurne %>% crop(st_transform(roi,crs(temp_diurne)))
 temp_nocturne <- temp_nocturne %>% crop(st_transform(roi,crs(temp_nocturne)))
-bati <- bati %>% st_crop(st_transform(roi,st_crs(bati)))
+bati <- bati %>% st_crop(st_transform(roi,st_crs(bati))) %>% st_cast("POLYGON")
 
 writeRaster(impermeabilite,"data/processed_data/impermeabilite.tif")
 
@@ -71,11 +72,11 @@ write_sf(lcz,"data/processed_data/lcz.gpkg")
 
 ### conversion des données vectorielles en raster pour calcul métrique paysagères
 ## vegetation
-r <- raster(vegetation, res = 1, crs = '+proj=lcc +lat_1=49 +lat_2=44 +lat_0=46.5 +lon_0=3 +x_0=700000 +y_0=6600000 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs')
-vegetation_rast <- fasterize(vegetation, r, field="COD_VEG_n", background = 0)
-vegetation_rast <- crop(vegetation_rast, st_transform(roi,crs(vegetation_rast)))
 
-writeRaster(vegetation_rast,"data/processed_data/vegetation.tif")
+r <- raster(vegetation, res = 0.5, crs = '+proj=lcc +lat_1=49 +lat_2=44 +lat_0=46.5 +lon_0=3 +x_0=700000 +y_0=6600000 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs')
+vegetation_rast <- fasterize(vegetation, r, field="COD_VEG_n", background = 0)
+
+writeRaster(vegetation_rast,"data/processed_data/vegetation.tif", overwrite=TRUE)
 
 # raster attribute table
 vegetation_data_dic <- st_drop_geometry(vegetation) %>% mutate_if(is.factor, as.character)
@@ -84,19 +85,58 @@ colnames(vegetation_data_dic) <- c("class","label")
 vegetation_data_dic <- rbind(vegetation_data_dic,c(0,"Surface non végétalisée"))
 write.csv(vegetation_data_dic,"data/processed_data/vegetation_data_dic.csv", row.names = F)
 
-
-## occupation du sol
-r <- raster(occ_sol, res = 1, crs = '+proj=laea +lat_0=52 +lon_0=10 +x_0=4321000 +y_0=3210000 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs')
+## utilisation du sol
+r <- raster(occ_sol, res = 0.5, crs = '+proj=laea +lat_0=52 +lon_0=10 +x_0=4321000 +y_0=3210000 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs')
 occ_sol$code_2018=as.numeric(as.character(occ_sol$code_2018))
 occ_sol_rast <- fasterize(occ_sol, r, field="code_2018")
 
-writeRaster(occ_sol_rast,"data/processed_data/occ_sol.tif")
+writeRaster(occ_sol_rast,"data/processed_data/landuse.tif")
 
 # raster attribute table
 occ_sol_data_dic <- st_drop_geometry(occ_sol) %>% mutate_if(is.factor, as.character)
 occ_sol_data_dic <- unique(occ_sol_data_dic[c("code_2018", "class_2018")])
 colnames(occ_sol_data_dic) <- c("class","label")
-write.csv(occ_sol_data_dic,"data/processed_data/occ_sol_data_dic.csv",row.names = F)
+write.csv(occ_sol_data_dic,"data/processed_data/landuse_data_dic.csv",row.names = F)
+
+## occupation du sol (vegetation, bati, routes, autres)
+r <- raster(vegetation, res = 0.5, crs = '+proj=lcc +lat_1=49 +lat_2=44 +lat_0=46.5 +lon_0=3 +x_0=700000 +y_0=6600000 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs')
+
+vegetation_rast <- fasterize(vegetation, r, field="COD_VEG_n")
+occ_sol$code_2018=as.numeric(as.character(occ_sol$code_2018))
+utisol_rast <- fasterize(st_transform(occ_sol,st_crs(r)), r, field="code_2018")
+bati_rast <- fasterize(st_transform(bati,st_crs(r)), r, field = "code_departement_insee")
+
+bati_rast[bati_rast == 1] <- 10
+utisol_rast[utisol_rast == 12220] <- 11
+utisol_rast[utisol_rast != 11] <- 0
+
+vegetation_rast[is.na(vegetation_rast)] <- bati_rast[is.na(vegetation_rast)]
+vegetation_rast[is.na(vegetation_rast)] <- utisol_rast[is.na(vegetation_rast)]
+
+landcover_rast <- vegetation_rast
+writeRaster(landcover_rast,"data/processed_data/landcover.tif")
+
+# raster attribute table
+landcover_data_dic <- st_drop_geometry(vegetation) %>% mutate_if(is.factor, as.character)
+landcover_data_dic <- unique(landcover_data_dic[c("COD_VEG_n", "LIB_VEG_n")])
+colnames(landcover_data_dic) <- c("class","label")
+landcover_data_dic <- rbind(landcover_data_dic,c(0,"Autres"))
+landcover_data_dic <- rbind(landcover_data_dic,c(10,"Batiments"))
+landcover_data_dic <- rbind(landcover_data_dic,c(11,"Routes"))
+
+write.csv(landcover_data_dic,"data/processed_data/landcover_data_dic.csv", row.names = F)
+
+# même couche mais en regroupant certaines classes de végétation 
+landcover_rast[landcover_rast %in% c(1,2,3,4,5)] <- 12
+landcover_rast[landcover_rast %in% c(6,7,8,9)] <- 13
+
+writeRaster(landcover_rast,"data/processed_data/landcover_grouped_veget.tif")
+
+# raster attribute table
+landcover_grouped_data_dic <- landcover_data_dic %>% filter(class %in% c(0,10,11))
+landcover_grouped_data_dic <- rbind(landcover_grouped_data_dic,c(12,"Vegetation sup_3m"))
+landcover_grouped_data_dic <- rbind(landcover_grouped_data_dic,c(13,"Vegetation inf_3m"))
+write.csv(landcover_grouped_data_dic,"data/processed_data/landcover_grouped_veget_data_dic.csv", row.names = F)
 
 ## modèle numérique d'élévation
 
@@ -125,12 +165,18 @@ terra::writeRaster(mne_veget,"data/processed_data/mne_veget.tif", overwrite = T)
 
 
 ## données météo
-df_meteo <- list.files("data/METEO_SYNOP", full.names = T) %>%
-  purrr::map_dfr(.,~read.csv(., sep = ";", stringsAsFactors = F, na.strings = "mq")) %>%
-  filter(numer_sta == 07643) %>% # code station meteo montpellier
-  mutate(date = parse_date_time(date,"ymdHMS")) %>%
-  mutate(jour = as_date(date))
+# df_meteofrance <- list.files("data/METEO_SYNOP", full.names = T) %>%
+#   purrr::map_dfr(.,~read.csv(., sep = ";", stringsAsFactors = F, na.strings = "mq")) %>%
+#   filter(numer_sta == 07643) %>% # code station meteo montpellier
+#   mutate(date = parse_date_time(date,"ymdHMS")) %>%
+#   mutate(jour = as_date(date))
+
+# write.csv(df_meteofrance,"data/processed_data/meteo_macro_meteofrance.csv",row.names = F)
+
+df_meteo_dpt <- read.csv('/home/ptaconet/modeling_vector_mtp/data/Donnees_Climato_Dept34/Donnees/Station_202_20210526_J.csv', sep = ";",stringsAsFactors = F, na.strings = "", dec = ",") %>%
+  mutate(date = parse_date_time(date,"%d/%m/%Y"))
+
+write.csv(df_meteo_dpt,"data/processed_data/meteo_macro.csv",row.names = F)
 
 
-write.csv(df_meteo,"data/processed_data/meteo_macro.csv",row.names = F)
-
+  

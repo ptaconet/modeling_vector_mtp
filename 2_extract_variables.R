@@ -11,9 +11,14 @@ pieges <- st_read("localisation_piege_provisoire.gpkg")
 df_releves_pieges <- read.csv("collecte_BG_labo_mai_juin_V3.csv", stringsAsFactors = F, sep = ";")
 
 
-occ_sol_rast <- raster("data/processed_data/occ_sol.tif")
-#occ_sol_data_dict <- read.csv("data/processed_data/occ_sol_data_dic.csv", stringsAsFactors = F)
+landuse_rast <- raster("data/processed_data/landuse.tif")
+#landuse_data_dict <- read.csv("data/processed_data/landuse_data_dic.csv", stringsAsFactors = F)
+landcover_rast <- raster("data/processed_data/landcover.tif")
+#landcover_data_dict <- read.csv("data/processed_data/landcover_data_dic.csv", stringsAsFactors = F)
+landcover_grouped_veget_rast <- raster("data/processed_data/landcover_grouped_veget.tif")
+#landcover_grouped_veget_data_dict <- read.csv("data/processed_data/landcover_grouped_veget_data_dic.csv", stringsAsFactors = F)
 vegetation_rast <- raster("data/processed_data/vegetation.tif")
+vegetation_vect <- st_read("data/MMM_MMM_VegFine/MMM_MMM_VegFine.shp")
 #vegetation_data_dict <- read.csv("data/processed_data/vegetation_data_dic.csv", stringsAsFactors = F)
 mnt <- rast("data/processed_data/mnt.tif")
 mns <- rast("data/processed_data/mns.tif")
@@ -25,7 +30,8 @@ filosofi <- st_read("data/processed_data/filosofi.gpkg")
 bati <- st_read("data/processed_data/bati.gpkg")
 lcz <- st_read("data/processed_data/lcz.gpkg") %>% st_make_valid()
 meteo <- read.csv("data/processed_data/meteo_macro.csv", stringsAsFactors = F)
-  
+
+
 buffer_sizes <- c(20,50,100,250)
 lag_max <- 42
 
@@ -41,9 +47,10 @@ df_lsm_vegetation <- buffer_sizes %>%
   furrr::future_map_dfr(~landscapemetrics::sample_lsm(landscape = vegetation_rast,
                                                y =  st_transform(pieges, raster::crs(vegetation_rast)),
                                                plot_id = pieges$ID_PIEGE,
-                                               what = c("lsm_c_pland","lsm_l_ent"),
+                                               what = c( "lsm_c_area_mn", "lsm_c_area_sd", "lsm_c_contig_mn", "lsm_c_contig_sd", "lsm_c_ed", "lsm_c_frac_mn", "lsm_c_frac_sd", "lsm_c_pd", "lsm_c_pland" , "lsm_l_area_mn", "lsm_l_area_sd", "lsm_l_cohesion", "lsm_l_contag" ,"lsm_l_condent", "lsm_l_ed", "lsm_l_ent", "lsm_l_frac_mn", "lsm_l_frac_sd", "lsm_l_pd", "lsm_l_pr", "lsm_l_prd", "lsm_l_shdi", "lsm_l_shei", "lsm_l_sidi", "lsm_l_siei"),
                                                shape = "circle",
-                                               size = .),
+                                               size = .,
+                                               all_classes = T),
                  .id = "buffer")
 
 # df_lsm_vegetation <- df_lsm_vegetation %>%
@@ -54,16 +61,17 @@ df_lsm_vegetation <- buffer_sizes %>%
 
 df_lsm_occsol <- buffer_sizes %>%
   set_names(buffer_sizes) %>%
-  furrr::future_map_dfr(~landscapemetrics::sample_lsm(landscape = occ_sol_rast,
-                                                      y =  st_transform(pieges, raster::crs(occ_sol_rast)),
+  furrr::future_map_dfr(~landscapemetrics::sample_lsm(landscape = landuse_rast,
+                                                      y =  st_transform(pieges, raster::crs(landuse_rast)),
                                                       plot_id = pieges$ID_PIEGE,
-                                                      what = c("lsm_c_pland","lsm_l_ent"),
+                                                      what = c( "lsm_c_area_mn", "lsm_c_area_sd", "lsm_c_contig_mn", "lsm_c_contig_sd", "lsm_c_ed", "lsm_c_frac_mn", "lsm_c_frac_sd", "lsm_c_pd", "lsm_c_pland" , "lsm_l_area_mn", "lsm_l_area_sd", "lsm_l_cohesion", "lsm_l_contag" ,"lsm_l_condent", "lsm_l_ed", "lsm_l_ent", "lsm_l_frac_mn", "lsm_l_frac_sd", "lsm_l_pd", "lsm_l_pr", "lsm_l_prd", "lsm_l_shdi", "lsm_l_shei", "lsm_l_sidi", "lsm_l_siei"),
                                                       shape = "circle",
-                                                      size = .),
+                                                      size = .,
+                                                      all_classes = T),
                         .id = "buffer")
 
 # df_lsm_occsol <- df_lsm_occsol %>%
-#   left_join(occ_sol_data_dict)
+#   left_join(landuse_data_dict)
 
 # impermeabilisation des sols
 # dans les zones tampon : 
@@ -122,7 +130,9 @@ LCZ <- sf::st_intersection(pieges_proj,lcz) %>% st_drop_geometry()
 
 # filosofi
 pieges_proj <- st_transform(pieges,terra::crs(filosofi))
-df_filosofi <- sf::st_intersection(pieges_proj,filosofi) %>% st_drop_geometry()
+df_filosofi <- sf::st_intersection(pieges_proj,filosofi) %>% 
+  st_drop_geometry() %>%
+  dplyr::select(ID_PIEGE, Men, Men_pauv, Ind_snv, Log_av45, Log_45_70, Log_70_90, Log_ap90, Log_soc)
 
 # hauteur du bati dans les zones tampon
 pieges_proj <- st_transform(pieges,terra::crs(bati))
@@ -141,7 +151,13 @@ df_hauteur_bati <- buffer_sizes %>%
 # distance au batiment le plus proche
 nearest <- st_nearest_feature(pieges_proj,bati)
 dist <- st_distance(pieges_proj, bati[nearest,], by_element=TRUE) %>% as.numeric()
-df_dist <- data.frame(ID_PIEGE = pieges$ID_PIEGE, DBT = dist)
+df_dist_bat_plus_proche <- data.frame(ID_PIEGE = pieges$ID_PIEGE, DBT = dist)
+
+# distance au patch de végétation le plus proche
+pieges_proj <- st_transform(pieges,terra::crs(vegetation_vect))
+nearest <- st_nearest_feature(pieges_proj,vegetation_vect)
+dist <- st_distance(pieges_proj, vegetation_vect[nearest,], by_element=TRUE) %>% as.numeric()
+df_dist_veg_plus_proche <- data.frame(ID_PIEGE = pieges$ID_PIEGE, DVG = dist)
 
 
 # surface de bati dans les zones tampon
@@ -174,11 +190,14 @@ POP <- buffer_sizes %>%
 
 ## données temporelles (météo)
 
+# meteo <- meteo %>%
+#   group_by(jour) %>%
+#   summarise(RFD = sum(rr3, na.rm = T), HUM = mean(u)) %>%
+#   mutate(RFD = ifelse(RFD < 0, 0, RFD)) %>%
+#   rename(date = jour)
+
 meteo <- meteo %>%
-  group_by(jour) %>%
-  summarise(RFD = sum(rr3, na.rm = T), HUM = mean(u)) %>%
-  mutate(RFD = ifelse(RFD < 0, 0, RFD)) %>%
-  rename(date = jour)
+  rename(RFD = precipitations, TMIN = tmin, TMAX = tmax)
 
 df_releves_pieges <- df_releves_pieges %>%
   mutate(DATE_POSE = parse_date(DATE_POSE,"%d/%m/%Y")) %>%
@@ -261,9 +280,11 @@ df_filosofi = df_filosofi %>%
    mutate(ID_PIEGE = as.character(ID_PIEGE)) %>%
   dplyr::select(-c("ZONE", "TYPE_PIEGE", "LATITUDE", "LONGITUDE"))
  
-df_dist = df_dist %>%
+df_dist_bat_plus_proche = df_dist_bat_plus_proche %>%
    mutate(ID_PIEGE = as.character(ID_PIEGE))
  
+df_dist_veg_plus_proche = df_dist_veg_plus_proche %>%
+  mutate(ID_PIEGE = as.character(ID_PIEGE))
 
 df_hauteur_bati <- df_hauteur_bati %>%
   mutate(buffer = as.numeric(buffer)) %>%
@@ -300,7 +321,8 @@ df_model <- df_meteo_pieges %>%
   left_join(MNE) %>%
   left_join(LCZ) %>%
   left_join(df_filosofi) %>%
-  left_join(df_dist) %>%
+  left_join(df_dist_bat_plus_proche) %>%
+  left_join(df_dist_veg_plus_proche) %>%
   left_join(df_hauteur_bati) %>%
   left_join(df_surf_bati) %>%
   left_join(POP)
