@@ -169,14 +169,19 @@ terra::writeRaster(mne_veget,"data/processed_data/mne_veget.tif", overwrite = T)
 #   purrr::map_dfr(.,~read.csv(., sep = ";", stringsAsFactors = F, na.strings = "mq")) %>%
 #   filter(numer_sta == 07643) %>% # code station meteo montpellier
 #   mutate(date = parse_date_time(date,"ymdHMS")) %>%
-#   mutate(jour = as_date(date))
+#   mutate(jour = as_date(date)) %>%
+#   mutate(temp = t - 273.15) %>%
+#   group_by(jour) %>%
+#   summarise(precipitations = sum(rr3, na.rm = T), tmin = min(temp, na.rm = T), tmax = max(temp, na.rm = T), tmean = mean(temp, na.rm = T))
 
 # write.csv(df_meteofrance,"data/processed_data/meteo_macro_meteofrance.csv",row.names = F)
 
-df_meteo_dpt <- read.csv('/home/ptaconet/modeling_vector_mtp/data/Donnees_Climato_Dept34/Donnees/Station_202_20210526_J.csv', sep = ";",stringsAsFactors = F, na.strings = "", dec = ",") %>%
-  mutate(date = parse_date_time(date,"%d/%m/%Y"))
+df_meteo_dpt <- read.csv('/home/ptaconet/modeling_vector_mtp/data/Donnees_Climato_Dept34/Donnees/Station_202_20210526_H.csv', sep = ";",stringsAsFactors = F, na.strings = "", dec = ",", col.names = c('date',"heure","precipitations","temp")) %>%
+  mutate(date = parse_date_time(date,"%d/%m/%Y")) %>%
+  group_by(date) %>%
+  summarise(precipitations = sum(precipitations, na.rm = T), tmin = min(temp, na.rm = T), tmax = max(temp, na.rm = T), tmean = mean(temp, na.rm = T))
 
 write.csv(df_meteo_dpt,"data/processed_data/meteo_macro.csv",row.names = F)
 
 
-  
+

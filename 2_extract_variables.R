@@ -11,12 +11,14 @@ pieges <- st_read("localisation_piege_provisoire.gpkg") %>%
   filter(TYPE_PIEGE == 'bg-sentinel')
 
 df_releves_pieges <- read.csv("collecte_BG_labo.csv", stringsAsFactors = F, sep = ";") %>%
+  mutate(DATE_COLLECTE = parse_date(DATE_COLLECTE,"%d/%m/%Y")) %>%
   mutate(ID_PIEGE = case_when(ID_PIEGE %in% c("BG_12","BG_13") ~ "BG_12_13",
                               ID_PIEGE %in% c("BG_15","BG_16") ~ "BG_15_16",
                               TRUE ~ ID_PIEGE)) %>%
   group_by(ID_PIEGE, DATE_COLLECTE, NB_ALBO_TOT) %>%
   summarise(NB_ALBO_TOT = sum(NB_ALBO_TOT)) %>%
-  as_tibble()
+  as_tibble() %>%
+  mutate(ID_COLLECTE = seq(1,nrow(.),1))
 
 
 
@@ -50,7 +52,23 @@ options(future.globals.maxSize= 20000*1024^2)
 
 ## calcul des métriques paysagères
 
-# végétation
+# occupation du sol - 3 classes (végétation sup 3m, végétation inf 3m, bati, routes, autres)
+
+df_lsm_landcover_veget <- buffer_sizes %>%
+  set_names(buffer_sizes) %>%
+  furrr::future_map_dfr(~landscapemetrics::sample_lsm(landscape = landcover_grouped_veget_rast,
+                                                      y =  st_transform(pieges, raster::crs(landcover_grouped_veget_rast)),
+                                                      plot_id = pieges$ID_PIEGE,
+                                                      what = c("lsm_c_area_mn", "lsm_c_area_sd", "lsm_c_contig_mn", "lsm_c_contig_sd", "lsm_c_ed", "lsm_c_frac_mn", "lsm_c_frac_sd", "lsm_c_pd", "lsm_c_pland" , "lsm_l_area_mn", "lsm_l_area_sd", "lsm_l_cohesion", "lsm_l_contag" ,"lsm_l_condent", "lsm_l_ed", "lsm_l_ent", "lsm_l_frac_mn", "lsm_l_frac_sd", "lsm_l_pd", "lsm_l_pr", "lsm_l_prd", "lsm_l_shdi", "lsm_l_shei", "lsm_l_sidi", "lsm_l_siei"),
+                                                      shape = "circle",
+                                                      size = .,
+                                                      all_classes = T),
+                        .id = "buffer")
+
+# landcover_grouped_veget_rast <- landcover_grouped_veget_rast %>%
+#   left_join(landcover_grouped_veget_data_dict)
+
+# occupation du sol
 
 df_lsm_landcover <- buffer_sizes %>%
   set_names(buffer_sizes) %>%
@@ -67,7 +85,7 @@ df_lsm_landcover <- buffer_sizes %>%
 #   left_join(landcover_data_dict)
 
 
-# occupation du sol
+# utilisation du sol
 
 df_lsm_landuse <- buffer_sizes %>%
   set_names(buffer_sizes) %>%
@@ -153,8 +171,8 @@ df_hauteur_bati <- buffer_sizes %>%
                  .id = "buffer") %>%
   st_drop_geometry() %>%
   group_by(buffer,ID_PIEGE) %>%
-  summarise(num_batiments = n(), mean_hauteur = mean(hauteur,na.rm=T), sd_hauteur = sd(hauteur, na.rm = T), min_hauteur = min(hauteur, na.rm = T), max_hauteur = max(hauteur, na.rm = T)) %>%
-  complete(buffer, ID_PIEGE,  fill = list(num_batiments = 0, mean_hauteur = NA, sd_hauteur = NA, min_hauteur = NA, max_hauteur = NA)) %>%
+  summarise(BATN = n(), BATH_mn = mean(hauteur,na.rm=T), BATH_sd = sd(hauteur, na.rm = T), BATH_min = min(hauteur, na.rm = T), BATH_max = max(hauteur, na.rm = T)) %>%
+  complete(buffer, ID_PIEGE,  fill = list(BATN = 0, BATH_mn = NA, BATH_sd = NA, BATH_min = NA, BATH_max = NA)) %>%
   as_tibble()
 
 
@@ -179,8 +197,8 @@ df_surf_bati <- buffer_sizes %>%
   st_drop_geometry() %>%
   mutate(buffer = as.numeric(buffer)) %>%
   group_by(buffer,ID_PIEGE) %>%
-  summarise(tot_surf = sum(aire,na.rm=T), mean_surf = mean(aire,na.rm=T)) %>%
-  complete(buffer, ID_PIEGE,  fill = list(tot_surf = 0, mean_surf = 0)) %>%
+  summarise(BATS_sum = sum(aire,na.rm=T), BATS_mn = mean(aire,na.rm=T)) %>%
+  complete(buffer, ID_PIEGE,  fill = list(BATS_sum = 0, BATS_mn = 0)) %>%
   as_tibble()
 
 
@@ -193,8 +211,8 @@ POP <- buffer_sizes %>%
                  .id = "buffer") %>%
   st_drop_geometry() %>%
   group_by(buffer,ID_PIEGE) %>%
-  summarise(somme = sum(pop_2016), sd = sd(pop_2016)) %>%
-  complete(buffer, ID_PIEGE,  fill = list(somme = 0, sd = 0)) %>%
+  summarise(sum = sum(pop_2016), sd = sd(pop_2016)) %>%
+  complete(buffer, ID_PIEGE,  fill = list(sum = 0, sd = 0)) %>%
   as_tibble()
 
 ## points d'eau à proximité
@@ -206,8 +224,8 @@ GLP_nb <-  buffer_sizes %>%
                                          .id = "buffer") %>%
   st_drop_geometry() %>%
   group_by(buffer,ID_PIEGE) %>%
-  summarise(GLP_nb = n(), GLP_sum_vol = sum(V_EAU)) %>%
-  complete(buffer, ID_PIEGE,  fill = list(GLP_nb = 0, GLP_sum_vol = 0)) %>%
+  summarise(nb = n(), sum_vol = sum(V_EAU)) %>%
+  complete(buffer, ID_PIEGE,  fill = list(nb = 0, sum_vol = 0)) %>%
   as_tibble()
 
  
@@ -230,42 +248,132 @@ GLP_type_nearest <- pieges_proj %>%
 #   rename(date = jour)
 
 meteo <- meteo %>%
-  rename(RFD = precipitations, TMIN = tmin, TMAX = tmax)
+  rename(RFD = precipitations, TMIN = tmin, TMAX = tmax) %>%
+  filter(!is.na(RFD), !is.na(TMIN), !is.na(TMAX))
 
-df_releves_pieges <- df_releves_pieges %>%
-  mutate(DATE_POSE = parse_date(DATE_POSE,"%d/%m/%Y")) %>%
-  mutate(DATE_COLLECTE = parse_date(DATE_COLLECTE,"%d/%m/%Y")) %>%
-  dplyr::select(ID_PIEGE, DATE_COLLECTE)
+df_releves_pieges2 <- df_releves_pieges %>%
+  #mutate(DATE_POSE = parse_date(DATE_POSE,"%d/%m/%Y")) %>%
+  dplyr::select(ID_COLLECTE, ID_PIEGE, DATE_COLLECTE)
 
 
-df_meteo_pieges <- data.frame(ID_PIEGE = character(), date = character(), stringsAsFactors = F)
-for(i in 1:nrow(df_releves_pieges)){
+df_meteo_pieges <- data.frame(ID_COLLECTE = numeric(),ID_PIEGE = character(), date = character(), stringsAsFactors = F)
+for(i in 1:nrow(df_releves_pieges2)){
   for(j in 0:lag_max){
     df_meteo_pieges <- rbind(df_meteo_pieges,
-                             data.frame(#ID_COLLECTE = df_releves_pieges$ID_COLLECTE[i],
-                                        ID_PIEGE = df_releves_pieges$ID_PIEGE[i],
-                                        date = as.character(as.Date(df_releves_pieges$DATE_COLLECTE[i]-j)),
+                             data.frame(ID_COLLECTE = df_releves_pieges2$ID_COLLECTE[i],
+                                        ID_PIEGE = df_releves_pieges2$ID_PIEGE[i],
+                                        date = as.character(as.Date(df_releves_pieges2$DATE_COLLECTE[i]-j)),
                                         lag_n = j,
                                         stringsAsFactors = F))
   }
 }
 
+# summarizing to weeks
+df_meteo_pieges2 <- df_meteo_pieges %>% 
+  left_join(meteo) %>%
+  pivot_longer( !(ID_COLLECTE:lag_n), names_to = "var", values_to = 'val') %>%
+  mutate(idpointdecapture = paste0(ID_PIEGE,"_",ID_COLLECTE))
+
+
+fun_summarize_week <- function(df_meteo_pieges2,var_to_summarize){
+  
+  if(var_to_summarize=="RFD"){
+    df_meteo_pieges2_summarize <- df_meteo_pieges2 %>%
+      filter(var==var_to_summarize) %>%
+      group_by(idpointdecapture,lag_n = lubridate::week(date)) %>%
+      summarise(val=sum(val, na.rm = T),date = min(date)) %>%
+      group_by(idpointdecapture) %>%
+      mutate(lag_n=seq(n()-1,0,-1)) %>%
+      mutate(var = var_to_summarize) %>%
+      as_tibble()
+  } else {
+    df_meteo_pieges2_summarize <- df_meteo_pieges2 %>%
+      filter(var==var_to_summarize) %>%
+      group_by(idpointdecapture,lag_n = lubridate::week(date)) %>%
+      summarise(val=mean(val, na.rm = T),date = min(date)) %>%
+      group_by(idpointdecapture) %>%
+      mutate(lag_n=seq(n()-1,0,-1)) %>%
+      mutate(var = var_to_summarize) %>%
+      as_tibble()
+  }
+  return(df_meteo_pieges2_summarize)
+  
+}
+
+df_meteo_pieges_summ <- fun_summarize_week(df_meteo_pieges2,"RFD") %>%
+  bind_rows(fun_summarize_week(df_meteo_pieges2,"TMIN")) %>%
+  bind_rows(fun_summarize_week(df_meteo_pieges2,"TMAX"))
+
+# function to create the data.frame for CCM
+fun_ccm_df <- function(df_timeseries, varr, function_to_apply){
+  
+  df_timeseries_wide <- df_timeseries %>%
+    filter(var==varr) %>%
+    dplyr::select(-c("date","var")) %>%
+    arrange(lag_n) %>%
+    pivot_wider(values_from = val, names_from = lag_n, names_prefix = paste0(varr,"_"))
+  
+  max_col <- ncol(df_timeseries_wide)
+  
+  for(i in 2:(max_col-1)){
+    for(j in (i+1):max_col){
+      column_name <- paste0(colnames(df_timeseries_wide[i]),"_",(j-2))
+      if(function_to_apply=="mean"){
+        df_timeseries_wide[column_name] <- rowMeans(df_timeseries_wide[,i:j], na.rm = T)
+      } else if (function_to_apply=="sum"){
+        df_timeseries_wide[column_name] <- rowSums(df_timeseries_wide[,i:j], na.rm = T)
+      }
+    }
+  }
+  
+  for(i in 2:max_col){
+    colnames(df_timeseries_wide)[i] <- paste0(colnames(df_timeseries_wide)[i],"_",sub('.*\\_', '', colnames(df_timeseries_wide)[i]))
+  }
+  
+  return(df_timeseries_wide)
+  
+}
+
+
+df_meteo_pieges_summ_wide1 <- fun_ccm_df(df_meteo_pieges_summ,"RFD","sum")
+df_meteo_pieges_summ_wide2 <- fun_ccm_df(df_meteo_pieges_summ,"TMIN","mean")
+df_meteo_pieges_summ_wide3 <- fun_ccm_df(df_meteo_pieges_summ,"TMAX","mean")
+
+df_meteo_pieges_summ_wide <- df_meteo_pieges_summ_wide1 %>%
+  left_join(df_meteo_pieges_summ_wide2) %>%
+  left_join(df_meteo_pieges_summ_wide3)
 
 ###### restructuration des tables
 
 metrics_defs <- landscapemetrics::list_lsm() # list of landscape metrics
+
+df_lsm_landcover_veget <- df_lsm_landcover_veget %>%
+  dplyr::select(-c(id,percentage_inside)) %>%
+  rename(val=value,pixval=class) %>%
+  mutate(ID_PIEGE=plot_id) %>%
+  mutate(buffer=as.numeric(buffer)) %>%
+  mutate(layer_id = "LCG") %>%
+  dplyr::select(ID_PIEGE,buffer,pixval,level,metric,val,layer_id) %>%
+  left_join(metrics_defs) %>%
+  dplyr::select(-c(level,metric,name,type)) %>%
+  #pivot_wider(names_from = c(function_name,layer_id,buffer,pixval), values_from = val, names_sep = "_", values_fill = list(val = 0)) %>%  
+  pivot_wider(names_from = c(function_name,layer_id,buffer,pixval), values_from = val, names_sep = "_") %>%
+  mutate_at(vars(contains(c('lsm_c_area','lsm_c_pland'))),funs(replace_na(.,0))) %>%
+  mutate(ID_PIEGE = as.character(ID_PIEGE))
+
 
 df_lsm_landcover <- df_lsm_landcover %>%
   dplyr::select(-c(id,percentage_inside)) %>%
   rename(val=value,pixval=class) %>%
   mutate(ID_PIEGE=plot_id) %>%
   mutate(buffer=as.numeric(buffer)) %>%
-  mutate(layer_id = "VEG") %>%
+  mutate(layer_id = "LCV") %>%
   dplyr::select(ID_PIEGE,buffer,pixval,level,metric,val,layer_id) %>%
   left_join(metrics_defs) %>%
   dplyr::select(-c(level,metric,name,type)) %>%
-  pivot_wider(names_from = c(function_name,layer_id,buffer,pixval), values_from = val, names_sep = "_", values_fill = list(val = 0)) %>%
-  mutate_all(funs(replace_na(.,0))) %>%
+  #pivot_wider(names_from = c(function_name,layer_id,buffer,pixval), values_from = val, names_sep = "_", values_fill = list(val = 0)) %>%  
+  pivot_wider(names_from = c(function_name,layer_id,buffer,pixval), values_from = val, names_sep = "_") %>%
+  mutate_at(vars(contains(c('lsm_c_area','lsm_c_pland'))),funs(replace_na(.,0))) %>%
   mutate(ID_PIEGE = as.character(ID_PIEGE))
 
 
@@ -274,12 +382,13 @@ df_lsm_landuse <- df_lsm_landuse %>%
   rename(val=value,pixval=class) %>%
   mutate(ID_PIEGE=plot_id) %>%
   mutate(buffer=as.numeric(buffer)) %>%
-  mutate(layer_id = "OCS") %>%
+  mutate(layer_id = "LUS") %>%
   dplyr::select(ID_PIEGE,buffer,pixval,level,metric,val,layer_id) %>%
   left_join(metrics_defs) %>%
   dplyr::select(-c(level,metric,name,type)) %>%
-  pivot_wider(names_from = c(function_name,layer_id,buffer,pixval), values_from = val, names_sep = "_", values_fill = list(val = 0)) %>%
-  mutate_all(funs(replace_na(.,0))) %>%
+  #pivot_wider(names_from = c(function_name,layer_id,buffer,pixval), values_from = val, names_sep = "_", values_fill = list(val = 0)) %>%  
+  pivot_wider(names_from = c(function_name,layer_id,buffer,pixval), values_from = val, names_sep = "_") %>%
+  mutate_at(vars(contains(c('lsm_c_area','lsm_c_pland'))),funs(replace_na(.,0))) %>%
   mutate(ID_PIEGE = as.character(ID_PIEGE))
 
 
@@ -307,12 +416,16 @@ MNE <- MNE %>%
   mutate(ID_PIEGE = as.character(ID_PIEGE))
 
 LCZ = LCZ %>%
-  mutate(ID_PIEGE = as.character(ID_PIEGE))
+  mutate(ID_PIEGE = as.character(ID_PIEGE)) %>%
+  dplyr::select(ID_PIEGE, lib19_ni_1) %>%
+  rename(LCZ = lib19_ni_1)
  
 df_filosofi = df_filosofi %>%
    mutate(ID_PIEGE = as.character(ID_PIEGE)) %>%
   dplyr::select(-c("ZONE", "TYPE_PIEGE", "LATITUDE", "LONGITUDE"))
- 
+colnames(df_filosofi) <- paste0('FIL_',colnames(df_filosofi))
+colnames(df_filosofi)[1] <- 'ID_PIEGE'
+
 df_dist_bat_plus_proche = df_dist_bat_plus_proche %>%
    mutate(ID_PIEGE = as.character(ID_PIEGE))
  
@@ -321,12 +434,12 @@ df_dist_veg_plus_proche = df_dist_veg_plus_proche %>%
 
 df_hauteur_bati <- df_hauteur_bati %>%
   mutate(buffer = as.numeric(buffer)) %>%
-  pivot_wider(names_from = buffer, values_from = -c(buffer,ID_PIEGE), names_glue = "BAT_{buffer}_{.value}") %>%#, values_fill = list(val = 0))  
+  pivot_wider(names_from = buffer, values_from = -c(buffer,ID_PIEGE), names_glue = "{.value}_{buffer}") %>%#, values_fill = list(val = 0))  
   mutate(ID_PIEGE = as.character(ID_PIEGE))
 
 df_surf_bati <- df_surf_bati %>%
   mutate(buffer = as.numeric(buffer)) %>%
-  pivot_wider(names_from = buffer, values_from = -c(buffer,ID_PIEGE), names_glue = "BAT_{buffer}_{.value}") %>%#, values_fill = list(val = 0))  
+  pivot_wider(names_from = buffer, values_from = -c(buffer,ID_PIEGE), names_glue = "{.value}_{buffer}") %>%#, values_fill = list(val = 0))  
   mutate(ID_PIEGE = as.character(ID_PIEGE))
 
 POP <- POP %>%
@@ -339,22 +452,31 @@ GLP_nb <- GLP_nb %>%
   pivot_wider(names_from = buffer, values_from = -c(buffer,ID_PIEGE), names_glue = "GLP_{buffer}_{.value}") %>%#, values_fill = list(val = 0))  
   mutate(ID_PIEGE = as.character(ID_PIEGE))
 
-colnames(GLP_type_nearest) <- paste0("GLP_",colnames(GLP_type_nearest))
+colnames(GLP_type_nearest) <- paste0("GLP_nearest_",colnames(GLP_type_nearest))
 colnames(GLP_type_nearest)[1] <- "ID_PIEGE"
 
-df_meteo_pieges <- df_meteo_pieges %>% 
-  left_join(meteo) %>%
-  dplyr::select(-c(ID_PIEGE,date)) %>%
-  pivot_wider(names_from = lag_n, values_from = -c(lag_n,ID_COLLECTE), names_glue = "{.value}_{lag_n}", values_fn = mean) %>%
-  left_join(df_releves_pieges) %>%
-  relocate(ID_PIEGE, DATE_COLLECTE, .after = ID_COLLECTE)
+
+df_meteo_pieges_summ_wide <- df_meteo_pieges_summ_wide %>%
+  mutate(ID_PIEGE = sub('_[^_]*$', '', idpointdecapture)) %>%
+  mutate(ID_COLLECTE = as.numeric(sub('.*\\_', '', idpointdecapture))) %>%
+  left_join(df_releves_pieges2) %>%
+  relocate(ID_PIEGE,ID_COLLECTE,DATE_COLLECTE, .after = idpointdecapture)
   
+
+# df_meteo_pieges <- df_meteo_pieges %>% 
+#   left_join(meteo) %>%
+#   dplyr::select(-c(ID_PIEGE,date)) %>%
+#   pivot_wider(names_from = lag_n, values_from = -c(lag_n,ID_COLLECTE), names_glue = "{.value}_{lag_n}", values_fn = mean) %>%
+#   left_join(df_releves_pieges) %>%
+#   relocate(ID_PIEGE, DATE_COLLECTE, .after = ID_COLLECTE)
 
 # join all data to create 1 big dataset
 
-df_model <- df_meteo_pieges %>%
-  left_join(df_lsm_vegetation) %>%
-  left_join(df_lsm_occsol) %>%
+df_model <- df_meteo_pieges_summ_wide %>%
+  left_join(df_releves_pieges) %>%
+  left_join(df_lsm_landuse) %>%
+  left_join(df_lsm_landcover) %>%
+  left_join(df_lsm_landcover_veget) %>%
   left_join(IMP) %>%
   left_join(IMP2) %>%
   left_join(HVG) %>%
@@ -368,5 +490,7 @@ df_model <- df_meteo_pieges %>%
   left_join(df_surf_bati) %>%
   left_join(POP) %>%
   left_join(GLP_nb) %>%
-  left_join(GLP_type_nearest)
+  left_join(GLP_type_nearest) %>%
+  relocate(NB_ALBO_TOT, .after = DATE_COLLECTE)
   
+write.csv(df_model,"df_model.csv")
