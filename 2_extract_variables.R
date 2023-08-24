@@ -248,8 +248,8 @@ GLP_type_nearest <- pieges_proj %>%
 #   rename(date = jour)
 
 meteo <- meteo %>%
-  rename(RFD = precipitations, TMIN = tmin, TMAX = tmax) %>%
-  filter(!is.na(RFD), !is.na(TMIN), !is.na(TMAX))
+  rename(RFD = precipitations, TMIN = tmin, TMAX = tmax, TMN = tmean) %>%
+  filter(!is.na(RFD), !is.na(TMIN), !is.na(TMAX), !is.na(TMN))
 
 df_releves_pieges2 <- df_releves_pieges %>%
   #mutate(DATE_POSE = parse_date(DATE_POSE,"%d/%m/%Y")) %>%
@@ -302,7 +302,8 @@ fun_summarize_week <- function(df_meteo_pieges2,var_to_summarize){
 
 df_meteo_pieges_summ <- fun_summarize_week(df_meteo_pieges2,"RFD") %>%
   bind_rows(fun_summarize_week(df_meteo_pieges2,"TMIN")) %>%
-  bind_rows(fun_summarize_week(df_meteo_pieges2,"TMAX"))
+  bind_rows(fun_summarize_week(df_meteo_pieges2,"TMAX")) %>%
+  bind_rows(fun_summarize_week(df_meteo_pieges2,"TMN"))
 
 # function to create the data.frame for CCM
 fun_ccm_df <- function(df_timeseries, varr, function_to_apply){
@@ -338,10 +339,12 @@ fun_ccm_df <- function(df_timeseries, varr, function_to_apply){
 df_meteo_pieges_summ_wide1 <- fun_ccm_df(df_meteo_pieges_summ,"RFD","sum")
 df_meteo_pieges_summ_wide2 <- fun_ccm_df(df_meteo_pieges_summ,"TMIN","mean")
 df_meteo_pieges_summ_wide3 <- fun_ccm_df(df_meteo_pieges_summ,"TMAX","mean")
+df_meteo_pieges_summ_wide4 <- fun_ccm_df(df_meteo_pieges_summ,"TMN","mean")
 
 df_meteo_pieges_summ_wide <- df_meteo_pieges_summ_wide1 %>%
   left_join(df_meteo_pieges_summ_wide2) %>%
-  left_join(df_meteo_pieges_summ_wide3)
+  left_join(df_meteo_pieges_summ_wide3) %>%
+  left_join(df_meteo_pieges_summ_wide4)
 
 ###### restructuration des tables
 
@@ -474,6 +477,7 @@ df_meteo_pieges_summ_wide <- df_meteo_pieges_summ_wide %>%
 
 df_model <- df_meteo_pieges_summ_wide %>%
   left_join(df_releves_pieges) %>%
+  left_join(pieges %>% st_drop_geometry(), by = "ID_PIEGE") %>%
   left_join(df_lsm_landuse) %>%
   left_join(df_lsm_landcover) %>%
   left_join(df_lsm_landcover_veget) %>%
@@ -491,6 +495,7 @@ df_model <- df_meteo_pieges_summ_wide %>%
   left_join(POP) %>%
   left_join(GLP_nb) %>%
   left_join(GLP_type_nearest) %>%
-  relocate(NB_ALBO_TOT, .after = DATE_COLLECTE)
+  relocate(NB_ALBO_TOT, .after = DATE_COLLECTE) %>%
+  relocate(ZONE, TYPE_PIEGE, LATITUDE, LONGITUDE, lieu, .after = DATE_COLLECTE)
   
 write.csv(df_model,"df_model.csv")

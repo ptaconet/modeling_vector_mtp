@@ -3,8 +3,28 @@ library(lubridate)
 
 df_model <- read.csv("df_model.csv") %>% 
   mutate(DATE_COLLECTE = as.Date(DATE_COLLECTE))%>%
+  mutate(PRES_ALBO = ifelse(NB_ALBO_TOT>0,1,0)) %>%
   mutate(week = floor_date(DATE_COLLECTE, "weeks"))
 
+## boxplots nb albo capturés en fonction du temps
+# tous sites confondus
+ggplot(df_model, aes(x = df_model$week, y = df_model$NB_ALBO_TOT, group = df_model$week)) + 
+  geom_boxplot() + 
+  geom_jitter(position=position_jitter(3), cex=0.2)
+
+# en fonction des sites
+ggplot(df_model, aes(x = df_model$week, y = df_model$NB_ALBO_TOT, group = df_model$week)) + 
+  geom_boxplot() + 
+  geom_jitter(position=position_jitter(3), cex=0.2) + 
+  facet_wrap(.~lieu)
+  
+# en fonction des pièges
+ggplot(df_model, aes(x = df_model$week, y = df_model$NB_ALBO_TOT, group = df_model$week)) + 
+  geom_boxplot() + 
+  geom_jitter(position=position_jitter(3), cex=0.2) + 
+  facet_wrap(lieu~ID_PIEGE)
+
+## Boxplots Albo ~ conditions météo
 df_meteo <- read.csv("data/processed_data/meteo_macro.csv", stringsAsFactors = F) %>% 
   mutate(date = as.Date(date)) %>%
   filter(date > min(df_model$DATE_COLLECTE) - 30, date < max(df_model$DATE_COLLECTE) + 30) %>%
@@ -41,4 +61,4 @@ plot_albo_temperature <-  ggplot() +
   ggtitle("temperature")
 
 
-ggplot(df_model, aes(x = HVG_250_mean, y = NB_ALBO_TOT)) + geom_point() + geom_smooth()
+ggplot(df_model, aes(x = lsm_c_area_sd_LCV_50_1, y = NB_ALBO_TOT)) + geom_point()  + geom_smooth(method = "lm") #+ facet_wrap(.~lieu)
