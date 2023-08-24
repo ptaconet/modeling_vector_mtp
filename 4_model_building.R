@@ -65,7 +65,7 @@ fun_compute_glmm_univ <- function(df_glmm,indicator){
   
   
   func2 <- function(x){
-    ret <- broom.mixed::tidy(x, conf.int = TRUE,  exponentiate = ifelse(mod == "abundance",FALSE,TRUE))
+    ret <- broom.mixed::tidy(x, conf.int = TRUE,  exponentiate = ifelse(indicator == "abundance",FALSE,TRUE))
     return(ret)
   }
   
