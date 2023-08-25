@@ -59,7 +59,7 @@ df_lsm_landcover_veget <- buffer_sizes %>%
   furrr::future_map_dfr(~landscapemetrics::sample_lsm(landscape = landcover_grouped_veget_rast,
                                                       y =  st_transform(pieges, raster::crs(landcover_grouped_veget_rast)),
                                                       plot_id = pieges$ID_PIEGE,
-                                                      what = c("lsm_c_area_mn", "lsm_c_area_sd", "lsm_c_contig_mn", "lsm_c_contig_sd", "lsm_c_ed", "lsm_c_frac_mn", "lsm_c_frac_sd", "lsm_c_pd", "lsm_c_pland" , "lsm_l_area_mn", "lsm_l_area_sd", "lsm_l_cohesion", "lsm_l_contag" ,"lsm_l_condent", "lsm_l_ed", "lsm_l_ent", "lsm_l_frac_mn", "lsm_l_frac_sd", "lsm_l_pd", "lsm_l_pr", "lsm_l_prd", "lsm_l_shdi", "lsm_l_shei", "lsm_l_sidi", "lsm_l_siei"),
+                                                      what = c("lsm_c_ca","lsm_c_area_mn", "lsm_c_area_sd", "lsm_c_contig_mn", "lsm_c_contig_sd", "lsm_c_ed", "lsm_c_frac_mn", "lsm_c_frac_sd", "lsm_c_pd", "lsm_c_pland" , "lsm_l_area_mn", "lsm_l_area_sd", "lsm_l_cohesion", "lsm_l_contag" ,"lsm_l_condent", "lsm_l_ed", "lsm_l_ent", "lsm_l_frac_mn", "lsm_l_frac_sd", "lsm_l_pd", "lsm_l_pr", "lsm_l_prd", "lsm_l_shdi", "lsm_l_shei", "lsm_l_sidi", "lsm_l_siei"),
                                                       shape = "circle",
                                                       size = .,
                                                       all_classes = T),
@@ -75,7 +75,7 @@ df_lsm_landcover <- buffer_sizes %>%
   furrr::future_map_dfr(~landscapemetrics::sample_lsm(landscape = landcover_rast,
                                                y =  st_transform(pieges, raster::crs(landcover_rast)),
                                                plot_id = pieges$ID_PIEGE,
-                                               what = c("lsm_c_area_mn", "lsm_c_area_sd", "lsm_c_contig_mn", "lsm_c_contig_sd", "lsm_c_ed", "lsm_c_frac_mn", "lsm_c_frac_sd", "lsm_c_pd", "lsm_c_pland" , "lsm_l_area_mn", "lsm_l_area_sd", "lsm_l_cohesion", "lsm_l_contag" ,"lsm_l_condent", "lsm_l_ed", "lsm_l_ent", "lsm_l_frac_mn", "lsm_l_frac_sd", "lsm_l_pd", "lsm_l_pr", "lsm_l_prd", "lsm_l_shdi", "lsm_l_shei", "lsm_l_sidi", "lsm_l_siei"),
+                                               what = c("lsm_c_ca","lsm_c_area_mn", "lsm_c_area_sd", "lsm_c_contig_mn", "lsm_c_contig_sd", "lsm_c_ed", "lsm_c_frac_mn", "lsm_c_frac_sd", "lsm_c_pd", "lsm_c_pland" , "lsm_l_area_mn", "lsm_l_area_sd", "lsm_l_cohesion", "lsm_l_contag" ,"lsm_l_condent", "lsm_l_ed", "lsm_l_ent", "lsm_l_frac_mn", "lsm_l_frac_sd", "lsm_l_pd", "lsm_l_pr", "lsm_l_prd", "lsm_l_shdi", "lsm_l_shei", "lsm_l_sidi", "lsm_l_siei"),
                                                shape = "circle",
                                                size = .,
                                                all_classes = T),
@@ -92,7 +92,7 @@ df_lsm_landuse <- buffer_sizes %>%
   furrr::future_map_dfr(~landscapemetrics::sample_lsm(landscape = landuse_rast,
                                                       y =  st_transform(pieges, raster::crs(landuse_rast)),
                                                       plot_id = pieges$ID_PIEGE,
-                                                      what = c("lsm_c_area_mn", "lsm_c_area_sd", "lsm_c_contig_mn", "lsm_c_contig_sd", "lsm_c_ed", "lsm_c_frac_mn", "lsm_c_frac_sd", "lsm_c_pd", "lsm_c_pland" , "lsm_l_area_mn", "lsm_l_area_sd", "lsm_l_cohesion", "lsm_l_contag" ,"lsm_l_condent", "lsm_l_ed", "lsm_l_ent", "lsm_l_frac_mn", "lsm_l_frac_sd", "lsm_l_pd", "lsm_l_pr", "lsm_l_prd", "lsm_l_shdi", "lsm_l_shei", "lsm_l_sidi", "lsm_l_siei"),
+                                                      what = c("lsm_c_ca","lsm_c_area_mn", "lsm_c_area_sd", "lsm_c_contig_mn", "lsm_c_contig_sd", "lsm_c_ed", "lsm_c_frac_mn", "lsm_c_frac_sd", "lsm_c_pd", "lsm_c_pland" , "lsm_l_area_mn", "lsm_l_area_sd", "lsm_l_cohesion", "lsm_l_contag" ,"lsm_l_condent", "lsm_l_ed", "lsm_l_ent", "lsm_l_frac_mn", "lsm_l_frac_sd", "lsm_l_pd", "lsm_l_pr", "lsm_l_prd", "lsm_l_shdi", "lsm_l_shei", "lsm_l_sidi", "lsm_l_siei"),
                                                       shape = "circle",
                                                       size = .,
                                                       all_classes = T),
@@ -361,7 +361,7 @@ df_lsm_landcover_veget <- df_lsm_landcover_veget %>%
   dplyr::select(-c(level,metric,name,type)) %>%
   #pivot_wider(names_from = c(function_name,layer_id,buffer,pixval), values_from = val, names_sep = "_", values_fill = list(val = 0)) %>%  
   pivot_wider(names_from = c(function_name,layer_id,buffer,pixval), values_from = val, names_sep = "_") %>%
-  mutate_at(vars(contains(c('lsm_c_area','lsm_c_pland'))),funs(replace_na(.,0))) %>%
+  mutate_at(vars(contains(c('lsm_c_area','lsm_c_pland','lsm_c_ca'))),funs(replace_na(.,0))) %>%
   mutate(ID_PIEGE = as.character(ID_PIEGE))
 
 
@@ -376,7 +376,7 @@ df_lsm_landcover <- df_lsm_landcover %>%
   dplyr::select(-c(level,metric,name,type)) %>%
   #pivot_wider(names_from = c(function_name,layer_id,buffer,pixval), values_from = val, names_sep = "_", values_fill = list(val = 0)) %>%  
   pivot_wider(names_from = c(function_name,layer_id,buffer,pixval), values_from = val, names_sep = "_") %>%
-  mutate_at(vars(contains(c('lsm_c_area','lsm_c_pland'))),funs(replace_na(.,0))) %>%
+  mutate_at(vars(contains(c('lsm_c_area','lsm_c_pland','lsm_c_ca'))),funs(replace_na(.,0))) %>%
   mutate(ID_PIEGE = as.character(ID_PIEGE))
 
 
@@ -391,7 +391,7 @@ df_lsm_landuse <- df_lsm_landuse %>%
   dplyr::select(-c(level,metric,name,type)) %>%
   #pivot_wider(names_from = c(function_name,layer_id,buffer,pixval), values_from = val, names_sep = "_", values_fill = list(val = 0)) %>%  
   pivot_wider(names_from = c(function_name,layer_id,buffer,pixval), values_from = val, names_sep = "_") %>%
-  mutate_at(vars(contains(c('lsm_c_area','lsm_c_pland'))),funs(replace_na(.,0))) %>%
+  mutate_at(vars(contains(c('lsm_c_area','lsm_c_pland','lsm_c_ca'))),funs(replace_na(.,0))) %>%
   mutate(ID_PIEGE = as.character(ID_PIEGE))
 
 

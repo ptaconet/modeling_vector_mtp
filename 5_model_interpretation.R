@@ -38,7 +38,7 @@ univ_glmm_temporal <- glmm_univ_presence %>%
     arrange(rev(indicator),var) %>%
     mutate(univ_temporal = pmap(list(data,indicator), ~fun_ccm_plot2(correlation_df = ..1, var = ..1$label[1], time_frame = 1, indicator = ..2, metric_name = "glmm"))) %>%
     nest(-indicator) %>%
-    mutate(univ_temporal = map(data, ~wrap_plots(.x$univ_temporal, nrow = 1, ncol = 3))) %>%  ## mettre nrow = 2 pour CI
+    mutate(univ_temporal = map(data, ~wrap_plots(.x$univ_temporal, nrow = 1, ncol = 4))) %>%  ## mettre nrow = 2 pour CI
     #mutate(univ_temporal = pmap(list(univ_temporal,species,country,indicator), ~..1 + plot_annotation(title = paste(..2,..3,..4, sep = " - "), subtitle = paste("CCM using spearman coefficient"), caption = "Only significant results (pval <= 0.05) are displayed (non-signficant results are greyed out)"))) %>%
     dplyr::select(-data)
 

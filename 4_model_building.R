@@ -3,6 +3,7 @@ library(glmmTMB)
 library(purrr)
 library(furrr)
 library(correlation)
+library(caret)
 
 # open dataset containing the dependant and independent variables
 df_model <- read.csv("df_model.csv")
