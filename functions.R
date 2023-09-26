@@ -57,7 +57,7 @@ fun_ccm_plot2 <- function(correlation_df, var, time_frame,  metric_name, indicat
 }
 
 
-fun_plot_tile_univ_spatial <- function(correlation_df, metric_name , indicator){
+fun_plot_tile_univ_spatial <- function(correlation_df, metric_name , indicator, lc_source, type){
   
   correlation_df <- correlation_df %>%
     mutate(correlation = ifelse(indicator=="abundance",correlation,correlation-1))
@@ -78,16 +78,21 @@ fun_plot_tile_univ_spatial <- function(correlation_df, metric_name , indicator){
   
   
   p <- ggplot(correlation_df, aes(buffer, label)) + 
-    geom_tile(aes(fill = correlation), color = "white") + facet_grid(type~indicator, scales="free_y", space="free_y") +
+    geom_tile(aes(fill = correlation), color = "white") + 
+    facet_grid(type~indicator, scales="free_y", space="free_y") +
+    #facet_grid(.~indicator, scales="free_y", space="free_y") +
     xlab("buffer radius around the collection site (meters)") + 
     ylab("") +
     theme_bw() +
     theme(legend.position = "bottom",
           strip.text.x = element_text(size = 10),
-          strip.text.y = element_text(size = 10, face = "italic")
+          strip.text.y = element_text(size = 10, face = "italic"),
+          axis.text.y = element_text(size = 8)
     ) +
     #geom_text(aes(label = ifelse(is.na(correlation), "",paste(round(correlation,2), p.value2))), size = 3)
-    geom_text(aes(label = ifelse(is.na(correlation), "", p.value2)), size = 3)
+    geom_text(aes(label = ifelse(is.na(correlation), "", p.value2)), size = 3) + 
+    ggtitle(paste0(lc_source," - ", type))
+    
     
   
   if(metric_name == "glmm"){

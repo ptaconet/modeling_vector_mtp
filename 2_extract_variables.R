@@ -18,8 +18,16 @@ df_releves_pieges <- read.csv("collecte_BG_labo.csv", stringsAsFactors = F, sep 
   group_by(ID_PIEGE, DATE_COLLECTE, NB_ALBO_TOT) %>%
   summarise(NB_ALBO_TOT = sum(NB_ALBO_TOT)) %>%
   as_tibble() %>%
-  mutate(ID_COLLECTE = seq(1,nrow(.),1))
+  mutate(ID_COLLECTE = seq(1,nrow(.),1)) %>%
+  arrange(DATE_COLLECTE)
 
+df_releves_pieges$consecutive <- c(NA,diff(as.Date(df_releves_pieges$DATE_COLLECTE)) %in% c(0,1))
+df_releves_pieges$consecutive[1] = FALSE
+df_releves_pieges$num_session = cumsum(df_releves_pieges$consecutive==FALSE)
+df_releves_pieges$consecutive=NULL
+
+df_releves_pieges <- df_releves_pieges %>%
+  arrange(ID_COLLECTE)
 
 
 landuse_rast <- raster("data/processed_data/landuse.tif")
@@ -496,6 +504,6 @@ df_model <- df_meteo_pieges_summ_wide %>%
   left_join(GLP_nb) %>%
   left_join(GLP_type_nearest) %>%
   relocate(NB_ALBO_TOT, .after = DATE_COLLECTE) %>%
-  relocate(ZONE, TYPE_PIEGE, LATITUDE, LONGITUDE, lieu, .after = DATE_COLLECTE)
+  relocate(num_session, ZONE, TYPE_PIEGE, LATITUDE, LONGITUDE, lieu, .after = DATE_COLLECTE)
   
 write.csv(df_model,"df_model.csv")

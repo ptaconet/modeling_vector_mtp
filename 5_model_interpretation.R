@@ -42,8 +42,10 @@ univ_glmm_temporal <- glmm_univ_presence %>%
     #mutate(univ_temporal = pmap(list(univ_temporal,species,country,indicator), ~..1 + plot_annotation(title = paste(..2,..3,..4, sep = " - "), subtitle = paste("CCM using spearman coefficient"), caption = "Only significant results (pval <= 0.05) are displayed (non-signficant results are greyed out)"))) %>%
     dplyr::select(-data)
 
-wrap_plots(plots_univ_glmm_temporal$univ_temporal[1][[1]],plots_univ_glmm_temporal$univ_temporal[2][[1]], ncol = 1, nrow = 2) 
+p_meteo <- wrap_plots(plots_univ_glmm_temporal$univ_temporal[1][[1]],plots_univ_glmm_temporal$univ_temporal[2][[1]], ncol = 1, nrow = 2, tag_level = "new") 
   
+ggsave(filename = "plots/cross_correlation_maps.pdf",plot = p_meteo, device = "pdf")
+
 ### Spatial data - landscape metrics
 
 landuse_data_dict <- read.csv("data/processed_data/landuse_data_dic.csv", stringsAsFactors = F) %>% mutate(lc_source = "LUS")
@@ -65,11 +67,19 @@ univ_glmm_lsm <- glmm_univ_presence %>%
   rename(correlation = estimate) %>%
   mutate(label = ifelse(level=="landscape","landscape",label)) %>%
   mutate(label = paste0(label, " - ", metric," - ",name)) %>%
+  #nest(-c(lc_source,type))
   nest(-lc_source)
 
 plots_univ_glmm_spatial <- univ_glmm_lsm %>%
-  mutate(univ_spatial = pmap(list(data), ~fun_plot_tile_univ_spatial(correlation_df = ..1, metric_name = "glmm", indicator = ..1$indicator))) %>%
+  #mutate(univ_spatial = pmap(list(data,lc_source,type), ~fun_plot_tile_univ_spatial(correlation_df = ..1, metric_name = "glmm", indicator = ..1$indicator, lc_source = ..2, type = ..3))) %>%
+  mutate(univ_spatial = pmap(list(data,lc_source), ~fun_plot_tile_univ_spatial(correlation_df = ..1, metric_name = "glmm", indicator = ..1$indicator, lc_source = ..2, type = ""))) %>%
   dplyr::select(-data)
+
+
+#pmap(list(plots_univ_glmm_spatial$lc_source,plots_univ_glmm_spatial$type,plots_univ_glmm_spatial$univ_spatial),~ggsave(filename = paste0("plots/",..1,"_",..2,".jpg"),plot = ..3, device = "jpg"))
+
+pmap(list(plots_univ_glmm_spatial$lc_source,plots_univ_glmm_spatial$univ_spatial),~ggsave(filename = paste0("plots/",..1,".pdf"),plot = ..2, device = "pdf", width = 7,height = 14))
+
 
 univ_glmm_other_spat <- glmm_univ_presence %>%
   bind_rows(glmm_univ_abundance) %>%
@@ -94,16 +104,25 @@ univ_glmm_other_spat <- glmm_univ_presence %>%
   mutate(label = paste0(label," - ",fun_summarize))
   
 
-fun_plot_tile_univ_spatial(correlation_df = univ_glmm_other_spat, metric_name = "glmm", indicator = univ_glmm_other_spat$indicator)
+p <- fun_plot_tile_univ_spatial(correlation_df = univ_glmm_other_spat, metric_name = "glmm", indicator = univ_glmm_other_spat$indicator, lc_source = "Other spatial variables", type = "")
+
+ggsave(filename = "plots/other_spatial_var.jpg",plot = p, device = "jpg")
 
 # FILOSOFI
-glmm_univ_presence %>%
+fil <- glmm_univ_presence %>%
   bind_rows(glmm_univ_abundance) %>%
-  filter(grepl("FIL",term)) 
+  filter(grepl("FIL",term)) %>%
+  mutate(indicator = forcats::fct_relevel(indicator, c("presence","abundance"))) %>%
+  mutate(estimate = ifelse(indicator=="abundance",estimate,estimate-1)) %>%
+  filter(p.value<0.2)
 
 
+p2 <- ggplot(fil, aes(y = term, x = estimate)) + 
+  geom_point() + 
+  facet_wrap(.~indicator) + 
+  ggtitle("FILOSOFI")
 
-
+ggsave(filename = "plots/filosofi.jpg",plot = p2, device = "jpg")
 
 
 
