@@ -176,7 +176,8 @@ terra::writeRaster(mne_veget,"data/processed_data/mne_veget.tif", overwrite = T)
 
 # write.csv(df_meteofrance,"data/processed_data/meteo_macro_meteofrance.csv",row.names = F)
 
-df_meteo_dpt <- read.csv('/home/ptaconet/modeling_vector_mtp/data/Donnees_Climato_Dept34/Donnees/Station_202_20210526_H.csv', sep = ";",stringsAsFactors = F, na.strings = "", dec = ",", col.names = c('date',"heure","precipitations","temp")) %>%
+# https://odee.herault.fr/index.php/component/phocadownload/category/36-climatologie?download=5054:donnees-climato-dept34
+  df_meteo_dpt <- read.csv('/home/ptaconet/modeling_vector_mtp/data/Donnees_Climato_Dept34/Donnees/Station_202_20210526_H.csv', sep = ";",stringsAsFactors = F, na.strings = "", dec = ",", col.names = c('date',"heure","precipitations","temp")) %>%
   mutate(date = parse_date_time(date,"%d/%m/%Y")) %>%
   group_by(date) %>%
   summarise(precipitations = sum(precipitations, na.rm = T), tmin = min(temp, na.rm = T), tmax = max(temp, na.rm = T), tmean = mean(temp, na.rm = T))

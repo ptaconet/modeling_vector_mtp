@@ -10,7 +10,7 @@ library(lubridate)
 pieges <- st_read("localisation_piege_provisoire.gpkg") %>% 
   filter(TYPE_PIEGE == 'bg-sentinel')
 
-df_releves_pieges <- read.csv("collecte_BG_labo.csv", stringsAsFactors = F, sep = ";") %>%
+df_releves_pieges <- read.csv("BG_labo.csv", stringsAsFactors = F, sep = ";") %>%
   mutate(DATE_COLLECTE = parse_date(DATE_COLLECTE,"%d/%m/%Y")) %>%
   mutate(ID_PIEGE = case_when(ID_PIEGE %in% c("BG_12","BG_13") ~ "BG_12_13",
                               ID_PIEGE %in% c("BG_15","BG_16") ~ "BG_15_16",
