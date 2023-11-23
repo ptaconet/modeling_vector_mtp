@@ -18,10 +18,11 @@ glmm_univ_presence$indicator <- 'presence'
 glmm_univ_abundance$indicator <- 'abundance'
 
 
-### Meteorological data 
+### Macro-meteorological data preceding collection (CMM)
 univ_glmm_temporal <- glmm_univ_presence %>%
   bind_rows(glmm_univ_abundance) %>%
   filter(grepl("RFD|TMIN|TMAX|TMN",term)) %>%
+  filter(!grepl("collection|prec",term)) %>%
   mutate(var = sub('\\_.*', '', term)) %>%
   mutate(label = case_when(var == "RFD" ~ "Rainfall",
                            var == "TMIN" ~ "Minimum temperature",
@@ -46,6 +47,57 @@ p_meteo <- wrap_plots(plots_univ_glmm_temporal$univ_temporal[1][[1]],plots_univ_
   
 ggsave(filename = "plots/cross_correlation_maps.pdf",plot = p_meteo, device = "pdf")
 
+
+### Micro-climatic data
+univ_glmm_microclim <- glmm_univ_presence %>%
+  bind_rows(glmm_univ_abundance) %>%
+  filter(grepl("RFSUM|RFMIN|RFMAX|TMEAN|TMIN|TMAX|RHMEAN|RHMIN|RHMAX",term)) %>%
+  filter(grepl("collection|prec",term)) %>%
+  mutate(type = sub('\\_.*', '', term)) %>%
+  mutate(type = gsub("RFSUM|RFMAX|RFMIN","Rainfall",type)) %>%
+  mutate(type = gsub("TMEAN|TMIN|TMAX","Temperature",type)) %>%
+  mutate(type = gsub("RHMEAN|RHMIN|RHMAX","Humidity",type)) %>%
+  mutate(buffer = case_when(grepl("collection",term) ~ "during coll.",
+                            grepl("24h",term) ~ "24h",
+                            grepl("48h",term) ~ "48h",
+                            grepl("1s",term) ~ "1 week",
+                            grepl("2s",term) ~ "2 week",
+                            grepl("3s",term) ~ "3 week",
+                            grepl("4s",term) ~ "4 week",
+                            grepl("5s",term) ~ "5 week",
+                            grepl("6s",term) ~ "6 week")) %>%
+  mutate(term = gsub("collection","during collection",term)) %>%
+  mutate(term = gsub("24hprec|24h_prec","24h preceding collection",term)) %>%
+  mutate(term = gsub("48hprec|48h_prec","48h preceding collection",term)) %>%
+  mutate(term = gsub("1s_prec|1sprec","the week preceding collection",term)) %>%
+  mutate(term = gsub("2s_prec|2sprec","b/w 0 and 2 weeks preceding collection",term)) %>%
+  mutate(term = gsub("3s_prec|3sprec","b/w 0 and 3 weeks preceding collection",term)) %>%
+  mutate(term = gsub("4s_prec|4sprec","b/w 0 and 4 weeks preceding collection",term)) %>%
+  mutate(term = gsub("5s_prec|5sprec","b/w 0 and 5 weeks preceding collection",term)) %>%
+  mutate(term = gsub("6s_prec|6sprec","b/w 0 and 6 weeks preceding collection",term)) %>%
+  mutate(label = case_when(grepl("MAX",term) ~ "Maximum",
+                            grepl("MIN",term) ~ "Minimum",
+                            grepl("MEAN|SUM",term) ~ "Average")) %>%
+  mutate(term = gsub("RFSUM","Cumulative/average",term)) %>%
+  mutate(term = gsub("RFMAX","Maximum",term)) %>%
+  mutate(term = gsub("RFMIN","Minimum",term)) %>%
+  mutate(term = gsub("TMEAN","Cumulative/average",term)) %>%
+  mutate(term = gsub("TMIN","Minimum",term)) %>%
+  mutate(term = gsub("TMAX","Maximum",term)) %>%
+  mutate(term = gsub("RHMEAN","Cumulative/average",term)) %>%
+  mutate(term = gsub("RHMIN","Minimum",term)) %>%
+  mutate(term = gsub("RHMAX","Maximum",term)) %>%
+  mutate(term = gsub("_"," ",term)) %>%
+  mutate(correlation = ifelse(p.value<=0.2,estimate,NA)) %>%
+  mutate(indicator = forcats::fct_relevel(indicator, c("presence","abundance"))) %>%
+  mutate(label = forcats::fct_relevel(label, c("Minimum","Maximum","Average"))) %>%
+  mutate(buffer = forcats::fct_relevel(buffer, c("during coll.","24h","48h","1 week","2 week","3 week","4 week","5 week","6 week")))
+
+p_microclim <- fun_plot_tile_univ_spatial(univ_glmm_microclim, metric_name = "glmm", indicator = univ_glmm_microclim$term, lc_source = "Microclimatic conditions", type = "", xlabel = "time before collection")
+
+ggsave(filename = "plots/microclim.pdf",plot = p_microclim, device = "pdf")
+
+
 ### Spatial data - landscape metrics
 
 landuse_data_dict <- read.csv("data/processed_data/landuse_data_dic.csv", stringsAsFactors = F) %>% mutate(lc_source = "LUS")
@@ -62,6 +114,7 @@ univ_glmm_lsm <- glmm_univ_presence %>%
   bind_rows(glmm_univ_abundance) %>%
   filter(grepl("lsm",term)) %>%
   mutate(function_name = sub("\\_L.*", "", term), lc_source = word(term, -3, sep = "_"), buffer = word(term, -2, sep = "_"), class = word(term, -1, sep = "_")) %>%
+  mutate(buffer = forcats::fct_relevel(buffer, c("0","20","50","100","250"))) %>%
   left_join(list_lsm()) %>%
   left_join(lsm_data_dic) %>%
   rename(correlation = estimate) %>%
@@ -72,7 +125,7 @@ univ_glmm_lsm <- glmm_univ_presence %>%
 
 plots_univ_glmm_spatial <- univ_glmm_lsm %>%
   #mutate(univ_spatial = pmap(list(data,lc_source,type), ~fun_plot_tile_univ_spatial(correlation_df = ..1, metric_name = "glmm", indicator = ..1$indicator, lc_source = ..2, type = ..3))) %>%
-  mutate(univ_spatial = pmap(list(data,lc_source), ~fun_plot_tile_univ_spatial(correlation_df = ..1, metric_name = "glmm", indicator = ..1$indicator, lc_source = ..2, type = ""))) %>%
+  mutate(univ_spatial = pmap(list(data,lc_source), ~fun_plot_tile_univ_spatial(correlation_df = ..1, metric_name = "glmm", indicator = ..1$indicator, lc_source = ..2, type = "", xlabel = "buffer radius around the collection site (meters)"))) %>%
   dplyr::select(-data)
 
 
@@ -85,6 +138,7 @@ univ_glmm_other_spat <- glmm_univ_presence %>%
   bind_rows(glmm_univ_abundance) %>%
   filter(!grepl("lsm|RFD|TMIN|TMAX|TMN",term)) %>%
   mutate(buffer = ifelse(!grepl("BATH|BATS", term), word(term, 2, sep = "_"), word(term, 3, sep = "_"))) %>%
+  mutate(buffer = forcats::fct_relevel(buffer, c("0","20","50","100","250"))) %>%
   mutate( var =  word(term, 1, sep = "_")) %>%
   filter(!grepl("LCZ",term)) %>%
   filter(!grepl("nearest",buffer)) %>%
@@ -104,7 +158,7 @@ univ_glmm_other_spat <- glmm_univ_presence %>%
   mutate(label = paste0(label," - ",fun_summarize))
   
 
-p <- fun_plot_tile_univ_spatial(correlation_df = univ_glmm_other_spat, metric_name = "glmm", indicator = univ_glmm_other_spat$indicator, lc_source = "Other spatial variables", type = "")
+p <- fun_plot_tile_univ_spatial(correlation_df = univ_glmm_other_spat, metric_name = "glmm", indicator = univ_glmm_other_spat$indicator, lc_source = "Other spatial variables", type = "", xlabel = "buffer radius around the collection site (meters)")
 
 ggsave(filename = "plots/other_spatial_var.jpg",plot = p, device = "jpg")
 

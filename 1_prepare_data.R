@@ -5,6 +5,7 @@ library(rgdal)
 library(fasterize)
 library(rgdal)
 library(lubridate)
+library(readODS)
 
 ## ouverture des données de localisation des pièges
 pieges <- st_read("localisation_piege_provisoire.gpkg")
@@ -185,4 +186,47 @@ terra::writeRaster(mne_veget,"data/processed_data/mne_veget.tif", overwrite = T)
 write.csv(df_meteo_dpt,"data/processed_data/meteo_macro.csv",row.names = F)
 
 
+## Données mîcroclimatiques
+
+df_metadata <- read.csv("data/donnees_microclim/BG/donnees_pose_collecte_dl.csv", sep = ";", quote = "", stringsAsFactors = F)
+df_metadata$NOM_DOSSIER <- gsub("\"","",df_metadata$NOM_DOSSIER)
+df_metadata$lien_fichier <- paste0("data/donnees_microclim/BG/",df_metadata$NOM_DOSSIER,"/",df_metadata$NOM_FICHIER,".ods")
+df_metadata <- df_metadata %>% filter(!is.na(NOM_FICHIER))
+df_metadata$DATE_POSE <- as.Date(paste0(substr(df_metadata$DATE_POSE,7,10),"-",substr(df_metadata$DATE_POSE,4,5),"-",substr(df_metadata$DATE_POSE,1,2)))
+df_metadata$DATE_HEURE_POSE <- ymd_hms(paste(df_metadata$DATE_POSE,df_metadata$HEURE_POSE,":00"))
+df_metadata <- df_metadata %>% relocate(DATE_HEURE_POSE, .after = HEURE_POSE)
+df_metadata$DATE_RETRAIT <- as.Date(paste0(substr(df_metadata$DATE_RETRAIT,7,10),"-",substr(df_metadata$DATE_RETRAIT,4,5),"-",substr(df_metadata$DATE_RETRAIT,1,2)))
+df_metadata$DATE_HEURE_RETRAIT <- ymd_hms(paste(df_metadata$DATE_RETRAIT,df_metadata$HEURE_RETRAIT,":00"))
+df_metadata <- df_metadata %>% relocate(DATE_HEURE_RETRAIT, .after = HEURE_RETRAIT)
+
+
+fun_format_df_microclim <- function(path_to_df_microclim){
+  
+  df_microclim_format <- readODS::read_ods(path_to_df_microclim, skip = 3)
+  df_microclim_format <- df_microclim_format[,1:5]
+  colnames(df_microclim_format) <- c("date","heure","temperature","humidite","pointderosee")
+  df_microclim_format$date <- as.Date(paste0(substr(df_microclim_format$date,7,10),"-",substr(df_microclim_format$date,4,5),"-",substr(df_microclim_format$date,1,2)))
+  df_microclim_format$date_heure <- ymd_hms(paste(df_microclim_format$date,df_microclim_format$heure))
+  df_microclim_format <- df_microclim_format %>% relocate(date_heure, .after = heure)
+  
+  return(df_microclim_format)
+}
+
+df_microclim <- NULL
+
+for(i in 1:nrow(df_metadata)){
+  
+  th_df_microclim <- fun_format_df_microclim(df_metadata$lien_fichier[i])
+  th_df_microclim$ID_PIEGE <- df_metadata$ID_BG[i]
+  th_df_microclim$ID_COLLECTE_1 <- df_metadata$ID_COLLECTE_1[i]
+  th_df_microclim$ID_COLLECTE_2 <- df_metadata$ID_COLLECTE_2[i]
+  th_df_microclim$ID_COLLECTE_3 <- df_metadata$ID_COLLECTE_3[i]
+  th_df_microclim$ID_COLLECTE_4 <- df_metadata$ID_COLLECTE_4[i]
+  
+  df_microclim <- rbind(df_microclim,th_df_microclim)
+  
+  
+}
+
+write.csv(df_microclim,"data/processed_data/microclim.csv", row.names = F)
 

@@ -57,13 +57,12 @@ fun_ccm_plot2 <- function(correlation_df, var, time_frame,  metric_name, indicat
 }
 
 
-fun_plot_tile_univ_spatial <- function(correlation_df, metric_name , indicator, lc_source, type){
+fun_plot_tile_univ_spatial <- function(correlation_df, metric_name , indicator, lc_source, type, xlabel){
   
   correlation_df <- correlation_df %>%
     mutate(correlation = ifelse(indicator=="abundance",correlation,correlation-1))
   
   correlation_df <- correlation_df %>%
-    mutate(buffer = forcats::fct_relevel(buffer, c("0","20","50","100","250"))) %>%
     mutate(indicator = forcats::fct_relevel(indicator, c("presence","abundance")))
   
   #correlation_df$label <- factor(correlation_df$label, levels = unique(correlation_df$label[order(correlation_df$correlation)]))
@@ -81,7 +80,7 @@ fun_plot_tile_univ_spatial <- function(correlation_df, metric_name , indicator, 
     geom_tile(aes(fill = correlation), color = "white") + 
     facet_grid(type~indicator, scales="free_y", space="free_y") +
     #facet_grid(.~indicator, scales="free_y", space="free_y") +
-    xlab("buffer radius around the collection site (meters)") + 
+    xlab(xlabel) + 
     ylab("") +
     theme_bw() +
     theme(legend.position = "bottom",
