@@ -61,4 +61,4 @@ plot_albo_temperature <-  ggplot() +
   ggtitle("temperature")
 
 
-ggplot(df_model, aes(x = RFSUM_collection	, y = PRES_ALBO)) + geom_point()  + geom_smooth(method = "lm") #+ facet_wrap(.~lieu)
+ggplot(df_model, aes(x = RFSUM_collection	, y = NB_ALBO_TOT)) + geom_point()  + geom_smooth(method = "lm") #+ facet_wrap(.~lieu)

@@ -19,33 +19,65 @@ glmm_univ_abundance$indicator <- 'abundance'
 
 
 ### Macro-meteorological data preceding collection (CMM)
-univ_glmm_temporal <- glmm_univ_presence %>%
+
+univ_glmm_temporal_sy <- glmm_univ_presence %>%
   bind_rows(glmm_univ_abundance) %>%
-  filter(grepl("RFD|TMIN|TMAX|TMN",term)) %>%
+  filter(grepl("RFDsy|TMINsy|TMAXsy|TMNsy|TAMPsy|RHsy|WINDsy",term)) %>%
   filter(!grepl("collection|prec",term)) %>%
   mutate(var = sub('\\_.*', '', term)) %>%
-  mutate(label = case_when(var == "RFD" ~ "Rainfall",
-                           var == "TMIN" ~ "Minimum temperature",
-                           var == "TMAX" ~ "Maximum temperature",
-                           var == "TMN" ~ "Average temperature")) %>%
+  mutate(label = case_when(var == "RFDsy" ~ "Rainfall",
+                           var == "TMINsy" ~ "Minimum temperature",
+                           var == "TMAXsy" ~ "Maximum temperature",
+                           var == "TMNsy" ~ "Average temperature",
+                           var == "TAMPsy" ~ "Temperature amplitude")) %>%
   mutate(time_lag_1 = as.numeric(sub('.*\\_', '', term)), time_lag_2 = as.numeric(stringr::str_match( term, '([^_]+)(?:_[^_]+){1}$')[,2])) %>%
   arrange(var, indicator, time_lag_1, time_lag_2) %>%
   rename(correlation = estimate) %>%
   mutate(correlation = ifelse(p.value<=0.2,correlation,NA)) %>%
   nest(-c(indicator,var))
 
+plots_univ_glmm_temporal_sy <- univ_glmm_temporal_sy %>%
+  arrange(rev(indicator),factor(var, levels = c("RFDsy","TMNsy","TMINsy","TMAXsy","TAMPsy"))) %>%
+  mutate(univ_temporal = pmap(list(data,indicator), ~fun_ccm_plot2(correlation_df = ..1, var = ..1$label[1], time_frame = 1, indicator = ..2, metric_name = "glmm"))) %>%
+  nest(-indicator) %>%
+  mutate(univ_temporal = map(data, ~wrap_plots(.x$univ_temporal, nrow = 1, ncol = 5))) %>%
+  #mutate(univ_temporal = pmap(list(univ_temporal,species,country,indicator), ~..1 + plot_annotation(title = paste(..2,..3,..4, sep = " - "), subtitle = paste("CCM using spearman coefficient"), caption = "Only significant results (pval <= 0.05) are displayed (non-signficant results are greyed out)"))) %>%
+  dplyr::select(-data)
 
-  plots_univ_glmm_temporal <- univ_glmm_temporal %>%
-    arrange(rev(indicator),var) %>%
+p_meteo_sy <- wrap_plots(plots_univ_glmm_temporal_sy$univ_temporal[1][[1]],plots_univ_glmm_temporal_sy$univ_temporal[2][[1]], ncol = 1, nrow = 2, tag_level = "new") 
+ggsave(filename = "plots/cross_correlation_maps_synop.pdf",plot = p_meteo_sy, device = "pdf")
+
+
+univ_glmm_temporal_mf <- glmm_univ_presence %>%
+  bind_rows(glmm_univ_abundance) %>%
+  filter(grepl("RFDmf|TMINmf|TMAXmf|TMNmf|TAMPmf|RHmf|WINDmf",term)) %>%
+  filter(!grepl("collection|prec",term)) %>%
+  mutate(var = sub('\\_.*', '', term)) %>%
+  mutate(label = case_when(var == "RFDmf" ~ "Rainfall",
+                           var == "TMINmf" ~ "Minimum temperature",
+                           var == "TMAXmf" ~ "Maximum temperature",
+                           var == "TMNmf" ~ "Average temperature",
+                           var == "TAMPmf" ~ "Temperature amplitude",
+                           var == "RHmf" ~ "Relative humidity",
+                           var == "WINDmf" ~ "Wind speed")) %>%
+  mutate(time_lag_1 = as.numeric(sub('.*\\_', '', term)), time_lag_2 = as.numeric(stringr::str_match( term, '([^_]+)(?:_[^_]+){1}$')[,2])) %>%
+  arrange(var, indicator, time_lag_1, time_lag_2) %>%
+  rename(correlation = estimate) %>%
+  mutate(correlation = ifelse(p.value<=0.2,correlation,NA)) %>%
+  nest(-c(indicator,var))
+  
+
+  plots_univ_glmm_temporal_mf <- univ_glmm_temporal_mf %>%
+    arrange(rev(indicator),factor(var, levels = c("RFDmf","TMNmf","TMINmf","TMAXmf","TAMPmf","RHmf","WINDmf"))) %>%
     mutate(univ_temporal = pmap(list(data,indicator), ~fun_ccm_plot2(correlation_df = ..1, var = ..1$label[1], time_frame = 1, indicator = ..2, metric_name = "glmm"))) %>%
     nest(-indicator) %>%
-    mutate(univ_temporal = map(data, ~wrap_plots(.x$univ_temporal, nrow = 1, ncol = 4))) %>%  ## mettre nrow = 2 pour CI
+    mutate(univ_temporal = map(data, ~wrap_plots(.x$univ_temporal, nrow = 1, ncol = 7))) %>%
     #mutate(univ_temporal = pmap(list(univ_temporal,species,country,indicator), ~..1 + plot_annotation(title = paste(..2,..3,..4, sep = " - "), subtitle = paste("CCM using spearman coefficient"), caption = "Only significant results (pval <= 0.05) are displayed (non-signficant results are greyed out)"))) %>%
     dplyr::select(-data)
 
-p_meteo <- wrap_plots(plots_univ_glmm_temporal$univ_temporal[1][[1]],plots_univ_glmm_temporal$univ_temporal[2][[1]], ncol = 1, nrow = 2, tag_level = "new") 
-  
-ggsave(filename = "plots/cross_correlation_maps.pdf",plot = p_meteo, device = "pdf")
+
+p_meteo_mf <- wrap_plots(plots_univ_glmm_temporal_mf$univ_temporal[1][[1]],plots_univ_glmm_temporal_mf$univ_temporal[2][[1]], ncol = 1, nrow = 2, tag_level = "new") 
+ggsave(filename = "plots/cross_correlation_maps_meteofrance.pdf",plot = p_meteo_mf, device = "pdf")
 
 
 ### Micro-climatic data

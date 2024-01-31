@@ -60,7 +60,8 @@ filosofi <- st_read("data/processed_data/filosofi.gpkg")
 bati <- st_read("data/processed_data/bati.gpkg")
 lcz <- st_read("data/processed_data/lcz.gpkg") %>% st_make_valid()
 eau <- st_read("data/processed_data/point_eau.gpkg") %>% mutate(V_EAU = as.numeric(as.character(V_EAU)))
-meteo <- read.csv("data/processed_data/meteo_macro.csv", stringsAsFactors = F)
+meteo_synop <- read.csv("data/processed_data/meteo_macro.csv", stringsAsFactors = F)
+meteo_meteofrance <- read.csv("data/processed_data/meteo_macro_meteofrance.csv", stringsAsFactors = F)
 meteo_microclim <- read.csv("data/processed_data/microclim.csv", stringsAsFactors = F)
 
 
@@ -259,17 +260,11 @@ HVG2 <- left_join(HVG2,pieges_proj) %>%
     left_join(df_dist_eau_plus_proche) %>%
     dplyr::select(ID_PIEGE, EXPO_SOLEIL, CLASSE_GLP, NATURE_GLP,  TYPE_GLP, DESCRIPT_GLP, TEMPO_GLP, V_EAU, ASPECT_EAU,  DEAU )
   
-  ## données temporelles (météo)
+  ## données temporelles (météo Synop)
   
-  # meteo <- meteo %>%
-  #   group_by(jour) %>%
-  #   summarise(RFD = sum(rr3, na.rm = T), HUM = mean(u)) %>%
-  #   mutate(RFD = ifelse(RFD < 0, 0, RFD)) %>%
-  #   rename(date = jour)
-  
-  meteo <- meteo %>%
-    rename(RFD = precipitations, TMIN = tmin, TMAX = tmax, TMN = tmean) %>%
-    filter(!is.na(RFD), !is.na(TMIN), !is.na(TMAX), !is.na(TMN))
+  meteo <- meteo_synop %>%
+    rename(RFDsy = precipitations, TMINsy = tmin, TMAXsy = tmax, TMNsy = tmean, TAMPsy = tamp) %>%
+    filter(!is.na(RFDsy), !is.na(TMINsy), !is.na(TMAXsy), !is.na(TMNsy), !is.na(TAMPsy))
   
   df_releves_pieges2 <- df_releves_pieges %>%
     #mutate(DATE_POSE = parse_date(DATE_POSE,"%d/%m/%Y")) %>%
@@ -297,7 +292,7 @@ HVG2 <- left_join(HVG2,pieges_proj) %>%
   
   fun_summarize_week <- function(df_meteo_pieges2,var_to_summarize){
     
-    if(var_to_summarize=="RFD"){
+    if(grepl("RFD",var_to_summarize)){
       df_meteo_pieges2_summarize <- df_meteo_pieges2 %>%
         filter(var==var_to_summarize) %>%
         group_by(idpointdecapture,lag_n = lubridate::week(date)) %>%
@@ -320,10 +315,11 @@ HVG2 <- left_join(HVG2,pieges_proj) %>%
     
   }
   
-  df_meteo_pieges_summ <- fun_summarize_week(df_meteo_pieges2,"RFD") %>%
-    bind_rows(fun_summarize_week(df_meteo_pieges2,"TMIN")) %>%
-    bind_rows(fun_summarize_week(df_meteo_pieges2,"TMAX")) %>%
-    bind_rows(fun_summarize_week(df_meteo_pieges2,"TMN"))
+  df_meteo_pieges_summ <- fun_summarize_week(df_meteo_pieges2,"RFDsy") %>%
+    bind_rows(fun_summarize_week(df_meteo_pieges2,"TMINsy")) %>%
+    bind_rows(fun_summarize_week(df_meteo_pieges2,"TMAXsy")) %>%
+    bind_rows(fun_summarize_week(df_meteo_pieges2,"TMNsy")) %>%
+    bind_rows(fun_summarize_week(df_meteo_pieges2,"TAMPsy"))
   
   # function to create the data.frame for CCM
   fun_ccm_df <- function(df_timeseries, varr, function_to_apply){
@@ -356,15 +352,79 @@ HVG2 <- left_join(HVG2,pieges_proj) %>%
   }
   
   
-  df_meteo_pieges_summ_wide1 <- fun_ccm_df(df_meteo_pieges_summ,"RFD","sum")
-  df_meteo_pieges_summ_wide2 <- fun_ccm_df(df_meteo_pieges_summ,"TMIN","mean")
-  df_meteo_pieges_summ_wide3 <- fun_ccm_df(df_meteo_pieges_summ,"TMAX","mean")
-  df_meteo_pieges_summ_wide4 <- fun_ccm_df(df_meteo_pieges_summ,"TMN","mean")
+  df_meteo_pieges_summ_wide1 <- fun_ccm_df(df_meteo_pieges_summ,"RFDsy","sum")
+  df_meteo_pieges_summ_wide2 <- fun_ccm_df(df_meteo_pieges_summ,"TMINsy","mean")
+  df_meteo_pieges_summ_wide3 <- fun_ccm_df(df_meteo_pieges_summ,"TMAXsy","mean")
+  df_meteo_pieges_summ_wide4 <- fun_ccm_df(df_meteo_pieges_summ,"TMNsy","mean")
+  df_meteo_pieges_summ_wide5 <- fun_ccm_df(df_meteo_pieges_summ,"TAMPsy","mean")
   
-  df_meteo_pieges_summ_wide <- df_meteo_pieges_summ_wide1 %>%
+  df_meteo_pieges_summ_wide_synop <- df_meteo_pieges_summ_wide1 %>%
     left_join(df_meteo_pieges_summ_wide2) %>%
     left_join(df_meteo_pieges_summ_wide3) %>%
-    left_join(df_meteo_pieges_summ_wide4)
+    left_join(df_meteo_pieges_summ_wide4) %>%
+    left_join(df_meteo_pieges_summ_wide5)
+  
+  
+  
+  
+  
+  ## données temporelles (météo France)
+  
+  meteo <- meteo_meteofrance %>%
+    rename(RFDmf = precipitations, TMINmf = tmin, TMAXmf = tmax, TMNmf = tmean, TAMPmf = tamp, RHmf = rh, WINDmf = wind) %>%
+    filter(!is.na(RFDmf), !is.na(TMINmf), !is.na(TMAXmf), !is.na(TMNmf), !is.na(TAMPmf), !is.na(RHmf), !is.na(WINDmf))
+  
+  df_releves_pieges2 <- df_releves_pieges %>%
+    #mutate(DATE_POSE = parse_date(DATE_POSE,"%d/%m/%Y")) %>%
+    dplyr::select(ID_COLLECTE, ID_PIEGE, DATE_COLLECTE)
+  
+  
+  df_meteo_pieges <- data.frame(ID_COLLECTE = numeric(),ID_PIEGE = character(), date = character(), stringsAsFactors = F)
+  for(i in 1:nrow(df_releves_pieges2)){
+    for(j in 0:lag_max){
+      df_meteo_pieges <- rbind(df_meteo_pieges,
+                               data.frame(ID_COLLECTE = df_releves_pieges2$ID_COLLECTE[i],
+                                          ID_PIEGE = df_releves_pieges2$ID_PIEGE[i],
+                                          date = as.character(as.Date(df_releves_pieges2$DATE_COLLECTE[i]-j)),
+                                          lag_n = j,
+                                          stringsAsFactors = F))
+    }
+  }
+  
+  # summarizing to weeks
+  df_meteo_pieges2 <- df_meteo_pieges %>% 
+    left_join(meteo) %>%
+    pivot_longer( !(ID_COLLECTE:lag_n), names_to = "var", values_to = 'val') %>%
+    mutate(idpointdecapture = paste0(ID_PIEGE,"_",ID_COLLECTE))
+  
+
+  
+  df_meteo_pieges_summ <- fun_summarize_week(df_meteo_pieges2,"RFDmf") %>%
+    bind_rows(fun_summarize_week(df_meteo_pieges2,"TMINmf")) %>%
+    bind_rows(fun_summarize_week(df_meteo_pieges2,"TMAXmf")) %>%
+    bind_rows(fun_summarize_week(df_meteo_pieges2,"TMNmf")) %>%
+    bind_rows(fun_summarize_week(df_meteo_pieges2,"TAMPmf")) %>%
+    bind_rows(fun_summarize_week(df_meteo_pieges2,"RHmf")) %>%
+    bind_rows(fun_summarize_week(df_meteo_pieges2,"WINDmf"))
+  
+  
+  df_meteo_pieges_summ_wide1 <- fun_ccm_df(df_meteo_pieges_summ,"RFDmf","sum")
+  df_meteo_pieges_summ_wide2 <- fun_ccm_df(df_meteo_pieges_summ,"TMINmf","mean")
+  df_meteo_pieges_summ_wide3 <- fun_ccm_df(df_meteo_pieges_summ,"TMAXmf","mean")
+  df_meteo_pieges_summ_wide4 <- fun_ccm_df(df_meteo_pieges_summ,"TMNmf","mean")
+  df_meteo_pieges_summ_wide5 <- fun_ccm_df(df_meteo_pieges_summ,"TAMPmf","mean")
+  df_meteo_pieges_summ_wide6 <- fun_ccm_df(df_meteo_pieges_summ,"RHmf","mean")
+  df_meteo_pieges_summ_wide7 <- fun_ccm_df(df_meteo_pieges_summ,"WINDmf","mean")
+  
+  df_meteo_pieges_summ_wide_meteofrance <- df_meteo_pieges_summ_wide1 %>%
+    left_join(df_meteo_pieges_summ_wide2) %>%
+    left_join(df_meteo_pieges_summ_wide3) %>%
+    left_join(df_meteo_pieges_summ_wide4) %>%
+    left_join(df_meteo_pieges_summ_wide5) %>%
+    left_join(df_meteo_pieges_summ_wide6) %>%
+    left_join(df_meteo_pieges_summ_wide7)
+  
+  
   
 
 ## rainfall during collection
@@ -652,12 +712,17 @@ colnames(GLP_type_nearest) <- paste0("GLP_nearest_",colnames(GLP_type_nearest))
 colnames(GLP_type_nearest)[1] <- "ID_PIEGE"
 
 
-df_meteo_pieges_summ_wide <- df_meteo_pieges_summ_wide %>%
+df_meteo_pieges_summ_wide_synop <- df_meteo_pieges_summ_wide_synop %>%
   mutate(ID_PIEGE = sub('_[^_]*$', '', idpointdecapture)) %>%
   mutate(ID_COLLECTE = as.numeric(sub('.*\\_', '', idpointdecapture))) %>%
   left_join(df_releves_pieges2) %>%
   relocate(ID_PIEGE,ID_COLLECTE,DATE_COLLECTE, .after = idpointdecapture)
   
+df_meteo_pieges_summ_wide_meteofrance <- df_meteo_pieges_summ_wide_meteofrance %>%
+  mutate(ID_PIEGE = sub('_[^_]*$', '', idpointdecapture)) %>%
+  mutate(ID_COLLECTE = as.numeric(sub('.*\\_', '', idpointdecapture))) %>%
+  left_join(df_releves_pieges2) %>%
+  relocate(ID_PIEGE,ID_COLLECTE,DATE_COLLECTE, .after = idpointdecapture)
 
 # df_meteo_pieges <- df_meteo_pieges %>% 
 #   left_join(meteo) %>%
@@ -668,7 +733,8 @@ df_meteo_pieges_summ_wide <- df_meteo_pieges_summ_wide %>%
 
 # join all data to create 1 big dataset
 
-df_model <- df_meteo_pieges_summ_wide %>%
+df_model <- df_meteo_pieges_summ_wide_synop %>%
+  left_join(df_meteo_pieges_summ_wide_meteofrance) %>%
   left_join(df_releves_pieges) %>%
   left_join(pieges %>% st_drop_geometry(), by = "ID_PIEGE") %>%
   left_join(df_lsm_landuse) %>%
