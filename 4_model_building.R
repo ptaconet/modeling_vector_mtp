@@ -3,7 +3,7 @@ library(glmmTMB)
 library(purrr)
 library(furrr)
 library(correlation)
-library(caret)
+
 
 # open dataset containing the dependant and independent variables
 df_model <- read.csv("df_model.csv")
@@ -13,7 +13,7 @@ df_model <- df_model %>%
   filter(!is.na(NB_ALBO_TOT)) %>%
   mutate(num_session=as.factor(num_session))
 
-predictors <- setdiff(colnames(df_model), c("X", "idpointdecapture", "ID_PIEGE", "num_session","ID_COLLECTE", "ZONE",  "TYPE_PIEGE", "LATITUDE", "LONGITUDE", "lieu",  "NB_ALBO_TOT","PRES_ALBO"))
+predictors <- setdiff(colnames(df_model), c("X", "idpointdecapture", "ID_PIEGE", "num_session","ID_COLLECTE", "ZONE",  "TYPE_PIEGE", "LATITUDE", "LONGITUDE", "lieu",  "NB_ALBO_TOT","PRES_ALBO","DATE_POSE","HEURE_COLLECTE","DATE_COLLECTE"))
 
 
 #############################
@@ -90,18 +90,3 @@ write.csv(glmm_univ_presence,'models_output/glmm_univ_presence.csv', row.names =
 df_glmm <- df_glmm %>% filter(NB_ALBO_TOT>0)
 glmm_univ_abundance <- fun_compute_glmm_univ(df_glmm, "abundance")
 write.csv(glmm_univ_abundance,'models_output/glmm_univ_abundance.csv', row.names = F)
-
-
-#############################
-####### multicollinearity among predictors
-#############################
-
-predictors_numeric <- df_model %>%
-  dplyr::select(predictors) %>%
-  dplyr::select_if(is.numeric)
-
-m <- cor(df_model[,colnames(predictors_numeric)], method = "pearson", use = "pairwise.complete.obs")
-
-# les variables qui sont corrélées au dessus de 0.8 (coeff de correlation de pearson) : 
-index <- which(abs(m) > .8 & abs(m) < 1,arr.ind = T) 
-p <- cbind.data.frame(stock1 = rownames(m)[index[,1]], stock2 = colnames(m)[index[,2]])

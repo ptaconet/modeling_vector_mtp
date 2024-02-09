@@ -10,7 +10,7 @@ library(lubridate)
 pieges <- st_read("localisation_piege_provisoire.gpkg") %>% 
   filter(TYPE_PIEGE == 'bg-sentinel')
 
-df_releves_pieges_raw <- read.csv("BG_labo.csv", stringsAsFactors = F, sep = ";") %>%
+df_releves_pieges_raw <- read.csv("BG_labo2.csv", stringsAsFactors = F, sep = ";") %>%
   mutate(HEURE_COLLECTE = ifelse(is.na(HEURE_COLLECTE),"10:00",HEURE_COLLECTE)) %>%
   rename(ID_COLLECTE_STRING = ID_COLLECTE) %>%
   mutate(DATE_POSE = parse_date(DATE_POSE,"%d/%m/%Y")) %>%
@@ -60,7 +60,7 @@ filosofi <- st_read("data/processed_data/filosofi.gpkg")
 bati <- st_read("data/processed_data/bati.gpkg")
 lcz <- st_read("data/processed_data/lcz.gpkg") %>% st_make_valid()
 eau <- st_read("data/processed_data/point_eau.gpkg") %>% mutate(V_EAU = as.numeric(as.character(V_EAU)))
-meteo_synop <- read.csv("data/processed_data/meteo_macro.csv", stringsAsFactors = F)
+meteo_ode <- read.csv("data/processed_data/meteo_macro.csv", stringsAsFactors = F)
 meteo_meteofrance <- read.csv("data/processed_data/meteo_macro_meteofrance.csv", stringsAsFactors = F)
 meteo_microclim <- read.csv("data/processed_data/microclim.csv", stringsAsFactors = F)
 
@@ -260,11 +260,11 @@ HVG2 <- left_join(HVG2,pieges_proj) %>%
     left_join(df_dist_eau_plus_proche) %>%
     dplyr::select(ID_PIEGE, EXPO_SOLEIL, CLASSE_GLP, NATURE_GLP,  TYPE_GLP, DESCRIPT_GLP, TEMPO_GLP, V_EAU, ASPECT_EAU,  DEAU )
   
-  ## données temporelles (météo Synop)
+  ## données temporelles (météo ode)
   
-  meteo <- meteo_synop %>%
-    rename(RFDsy = precipitations, TMINsy = tmin, TMAXsy = tmax, TMNsy = tmean, TAMPsy = tamp) %>%
-    filter(!is.na(RFDsy), !is.na(TMINsy), !is.na(TMAXsy), !is.na(TMNsy), !is.na(TAMPsy))
+  meteo <- meteo_ode %>%
+    rename(RFDode = precipitations, TMINode = tmin, TMAXode = tmax, TMNode = tmean, TAMPode = tamp) %>%
+    filter(!is.na(RFDode), !is.na(TMINode), !is.na(TMAXode), !is.na(TMNode), !is.na(TAMPode))
   
   df_releves_pieges2 <- df_releves_pieges %>%
     #mutate(DATE_POSE = parse_date(DATE_POSE,"%d/%m/%Y")) %>%
@@ -315,11 +315,11 @@ HVG2 <- left_join(HVG2,pieges_proj) %>%
     
   }
   
-  df_meteo_pieges_summ <- fun_summarize_week(df_meteo_pieges2,"RFDsy") %>%
-    bind_rows(fun_summarize_week(df_meteo_pieges2,"TMINsy")) %>%
-    bind_rows(fun_summarize_week(df_meteo_pieges2,"TMAXsy")) %>%
-    bind_rows(fun_summarize_week(df_meteo_pieges2,"TMNsy")) %>%
-    bind_rows(fun_summarize_week(df_meteo_pieges2,"TAMPsy"))
+  df_meteo_pieges_summ <- fun_summarize_week(df_meteo_pieges2,"RFDode") %>%
+    bind_rows(fun_summarize_week(df_meteo_pieges2,"TMINode")) %>%
+    bind_rows(fun_summarize_week(df_meteo_pieges2,"TMAXode")) %>%
+    bind_rows(fun_summarize_week(df_meteo_pieges2,"TMNode")) %>%
+    bind_rows(fun_summarize_week(df_meteo_pieges2,"TAMPode"))
   
   # function to create the data.frame for CCM
   fun_ccm_df <- function(df_timeseries, varr, function_to_apply){
@@ -352,13 +352,13 @@ HVG2 <- left_join(HVG2,pieges_proj) %>%
   }
   
   
-  df_meteo_pieges_summ_wide1 <- fun_ccm_df(df_meteo_pieges_summ,"RFDsy","sum")
-  df_meteo_pieges_summ_wide2 <- fun_ccm_df(df_meteo_pieges_summ,"TMINsy","mean")
-  df_meteo_pieges_summ_wide3 <- fun_ccm_df(df_meteo_pieges_summ,"TMAXsy","mean")
-  df_meteo_pieges_summ_wide4 <- fun_ccm_df(df_meteo_pieges_summ,"TMNsy","mean")
-  df_meteo_pieges_summ_wide5 <- fun_ccm_df(df_meteo_pieges_summ,"TAMPsy","mean")
+  df_meteo_pieges_summ_wide1 <- fun_ccm_df(df_meteo_pieges_summ,"RFDode","sum")
+  df_meteo_pieges_summ_wide2 <- fun_ccm_df(df_meteo_pieges_summ,"TMINode","mean")
+  df_meteo_pieges_summ_wide3 <- fun_ccm_df(df_meteo_pieges_summ,"TMAXode","mean")
+  df_meteo_pieges_summ_wide4 <- fun_ccm_df(df_meteo_pieges_summ,"TMNode","mean")
+  df_meteo_pieges_summ_wide5 <- fun_ccm_df(df_meteo_pieges_summ,"TAMPode","mean")
   
-  df_meteo_pieges_summ_wide_synop <- df_meteo_pieges_summ_wide1 %>%
+  df_meteo_pieges_summ_wide_ode <- df_meteo_pieges_summ_wide1 %>%
     left_join(df_meteo_pieges_summ_wide2) %>%
     left_join(df_meteo_pieges_summ_wide3) %>%
     left_join(df_meteo_pieges_summ_wide4) %>%
@@ -712,7 +712,7 @@ colnames(GLP_type_nearest) <- paste0("GLP_nearest_",colnames(GLP_type_nearest))
 colnames(GLP_type_nearest)[1] <- "ID_PIEGE"
 
 
-df_meteo_pieges_summ_wide_synop <- df_meteo_pieges_summ_wide_synop %>%
+df_meteo_pieges_summ_wide_ode <- df_meteo_pieges_summ_wide_ode %>%
   mutate(ID_PIEGE = sub('_[^_]*$', '', idpointdecapture)) %>%
   mutate(ID_COLLECTE = as.numeric(sub('.*\\_', '', idpointdecapture))) %>%
   left_join(df_releves_pieges2) %>%
@@ -733,7 +733,7 @@ df_meteo_pieges_summ_wide_meteofrance <- df_meteo_pieges_summ_wide_meteofrance %
 
 # join all data to create 1 big dataset
 
-df_model <- df_meteo_pieges_summ_wide_synop %>%
+df_model <- df_meteo_pieges_summ_wide_ode %>%
   left_join(df_meteo_pieges_summ_wide_meteofrance) %>%
   left_join(df_releves_pieges) %>%
   left_join(pieges %>% st_drop_geometry(), by = "ID_PIEGE") %>%
