@@ -35,7 +35,7 @@ df_meteo <- read.csv("data/processed_data/meteo_macro.csv", stringsAsFactors = F
 
 scaleFactor <- max(df_meteo$precipitations, na.rm = T) / max(df_model$NB_ALBO_TOT, na.rm = T)
 
-plot_albo_precipitations <-  ggplot() + 
+plot_albo_precipitations <- ggplot() + 
   geom_line(aes(x = df_meteo$week, y = df_meteo$precipitations), size = 0.5, show.legend = FALSE, color='steelblue') +
   geom_boxplot(aes(x = df_model$week, y = df_model$NB_ALBO_TOT * scaleFactor, group = df_model$week), show.legend = FALSE, outlier.shape=NA) + 
   geom_jitter(aes(x = df_model$week, y = df_model$NB_ALBO_TOT * scaleFactor, group = df_model$week), position=position_jitter(3), cex=0.2) + 

@@ -107,3 +107,24 @@ fun_plot_tile_univ_spatial <- function(correlation_df, metric_name , indicator, 
   return(p)
 }
 
+
+# comboSummary <- function(data, lev = NULL, model = NULL) {
+#   out <- c(twoClassSummary(data, lev, model), prSummary(data, lev, model))
+#   
+#   # add brier (see https://machinelearningmastery.com/tour-of-evaluation-metrics-for-imbalanced-classification/ and https://www.machinelearningplus.com/statistics/brier-score/)
+#   brier <- DescTools::BrierScore(data[, lev[1]], ifelse(data$obs == lev[1], 1, 0))
+#   out <- c(out,brier)
+#   names(out)[8] <- "brier"
+#   # special case missing value for F
+#   #out$F <- ifelse(is.na(out$F), 0, out$F)  
+#   names(out) <- gsub("AUC", "PR_AUC", names(out))
+#   names(out) <- gsub("ROC", "ROC_AUC", names(out))
+#   
+#   return(out)
+# }
+
+
+    
+
+
+
