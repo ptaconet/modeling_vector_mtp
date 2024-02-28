@@ -17,7 +17,7 @@ df_mod_abundance <- multiv_model_abundance[[3]]
 ## Model evaluation plots
 
 plot_eval_presence_model <- df_cv_presence %>%
-  dplyr::group_by(lieu,num_session) %>%   
+  dplyr::group_by(ID_PIEGE,lieu,num_session) %>%   
   dplyr::summarise(pred = mean(pred), obs = mean(obs)) %>%
   as_tibble() %>%
   pivot_longer(c('pred','obs')) %>%
@@ -25,7 +25,7 @@ plot_eval_presence_model <- df_cv_presence %>%
   ggplot(aes(x=num_session, y = value, color = name)) +
   geom_point() + 
   geom_line() + 
-  facet_wrap(.~lieu, scales = "free") + 
+  facet_wrap(ID_PIEGE~lieu, scales = "free") + 
   theme_bw() + 
   scale_colour_manual(values=c("#009E73","#E69F00"),na.translate = F) + 
   scale_x_continuous(breaks = c(1,2,3,4,5,6,7,8,9)) +
@@ -48,6 +48,7 @@ plot_validation_presence <- autoplot(precrec_obj,curvetype = c("ROC")) +
 plot_validation_presence+plot_eval_presence_model
 
 
+## abundance
 
 plot_eval_abundance_model <- df_cv_abundance %>%
   mutate(obs=exp(obs),pred=exp(pred)) %>%
@@ -90,6 +91,7 @@ df_metrics_perf <- df_cv_abundance2 %>%
             mse =  round(MLmetrics::MSE(y_true = obs ,y_pred = pred),2),
             rmse =  round(MLmetrics::RMSE(y_true = obs ,y_pred = pred),2),
             mape =  round(MLmetrics::MAPE(y_true = obs ,y_pred = pred),2),
+            r2 =  round(MLmetrics::R2_Score(y_true = obs ,y_pred = pred),2),
             n=n()) %>%
   as_tibble()
 
@@ -103,12 +105,24 @@ plot_validation_abundance <- ggplot() +
   ylab("Residuals (obs - pred)") + 
   geom_label(data = df_metrics_perf,
              size = 2.5,
-             mapping = aes(x = groups, y = max(df_cv_abundance2$residuals,na.rm = T), label = paste0('MAE = ',mae,'\nn = ',n),
+             mapping = aes(x = groups, y = max(df_cv_abundance2$residuals,na.rm = T), label = paste0('R2MSE = ',rmse,'\nn = ',n),
                            vjust = 1)) +
-  ggtitle("Abundance model: Mean Absolute Error by count class") + 
+  ggtitle("Abundance model: R squared by count class") + 
   geom_hline(yintercept=0, linetype="dashed") + 
   theme(axis.title.x = element_text(size = 8),
         axis.title.y = element_text(size = 8))
+
+
+# plot_validation_abundance <- df_cv_abundance %>%
+#   mutate(obs=exp(obs),pred=exp(pred)) %>%
+#   ggplot(aes(x=obs,y=pred, colour =as.factor(num_session))) +
+#   geom_point() + 
+#   #scale_x_sqrt(limits = c(0,100)) + 
+#   #scale_y_sqrt(limits = c(0,100)) + 
+#   theme_bw() + 
+#   geom_smooth(method = "lm", se = F) + 
+#   facet_wrap(~lieu , scales = 'free')
+
 
 plot_validation_abundance+plot_eval_abundance_model
 
@@ -161,14 +175,35 @@ for(i in 1:length(imp$var)){
 pd <- pdp::partial(model, pred.var = imp$var[i], pred.fun = pred_wrapper_classif, train = df)
 pd$yhat[which(pd$yhat<0)] <-0 
 p <- autoplot(pd, smooth = T)  
-dat <- ggplot_build(p)$data[[2]]
+dat1 <- ggplot_build(p)$data[[1]]
+dat2 <- ggplot_build(p)$data[[2]]
+
+if(imp$var[i]!="RFSUM_collection"){
 pdps[[i]] <- ggplot() + 
-  geom_line(data = dat, aes(x = x, y = y), size = 0.5, colour = "#009E73") + 
+  geom_line(data = dat1, aes(x = x, y = exp(y)), size = 0.3, colour = "black", alpha = 0.4) + 
+  geom_line(data = dat2, aes(x = x, y = y), size = 0.5, colour = "#009E73") + 
   geom_rug(data = df, aes_string(x = imp$var[i]), sides="b", length = unit(0.05, "npc")) + 
   ylim(c(0,1)) + 
   theme_bw() + 
   xlab(imp$var[i]) + 
   ylab("")
+} else {
+  dat1$x <- c("Absence","Presence")
+  df[,imp$var[i]][which(df[,imp$var[i]]==1)] <- "Presence"
+  df[,imp$var[i]][which(df[,imp$var[i]]==0)] <- "Absence"
+  
+  pdps[[i]] <- ggplot() + 
+    geom_bar(data = dat1, aes(x = x, y = y), size = 0.5, fill = "#009E73", stat = "identity") + 
+    geom_rug(data = df, aes_string(x = imp$var[i]), sides="b", length = unit(0.05, "npc")) + 
+    ylim(c(0,1)) + 
+    theme_bw() + 
+    xlab(imp$var[i]) + 
+    ylab("")
+  
+  df[,imp$var[i]][which(df[,imp$var[i]]=="Presence")] <- "1"
+  df[,imp$var[i]][which(df[,imp$var[i]]=="Absence")] <- "0"
+  df[,imp$var[i]] <- as.numeric(df[,imp$var[i]])
+}
 
 }
 
@@ -226,9 +261,11 @@ for(i in 1:length(imp$var)){
   pd <- pdp::partial(model, pred.var = imp$var[i], pred.fun = pred_wrapper_reg, train = df)
   pd$yhat[which(pd$yhat<0)] <-0 
   p <- autoplot(pd, smooth = T)  
-  dat <- ggplot_build(p)$data[[2]]
+  dat1 <- ggplot_build(p)$data[[1]]
+  dat2 <- ggplot_build(p)$data[[2]]
   pdps[[i]] <- ggplot() + 
-    geom_line(data = dat, aes(x = x, y = exp(y)), size = 0.5, colour = "#009E73") + 
+    geom_line(data = dat1, aes(x = x, y = exp(y)), size = 0.3, colour = "black", alpha = 0.4) + 
+    geom_line(data = dat2, aes(x = x, y = exp(y)), size = 0.5, colour = "#009E73") + 
     geom_rug(data = df, aes_string(x = imp$var[i]), sides="b", length = unit(0.05, "npc")) + 
     theme_bw() + 
     xlab(imp$var[i]) + 

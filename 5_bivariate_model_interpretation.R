@@ -22,14 +22,17 @@ glmm_univ_abundance$indicator <- 'abundance'
 
 univ_glmm_temporal_ode <- glmm_univ_presence %>%
   bind_rows(glmm_univ_abundance) %>%
-  filter(grepl("RFDode|TMINode|TMAXode|TMNode|TAMPode|RHode|WINDode",term)) %>%
+  filter(grepl("RFDode|TMINode|TMAXode|TMNode|TAMPode|RHode|WINDode|GDD",term)) %>%
   filter(!grepl("collection|prec",term)) %>%
   mutate(var = sub('\\_.*', '', term)) %>%
   mutate(label = case_when(var == "RFDode" ~ "Rainfall",
                            var == "TMINode" ~ "Minimum temperature",
                            var == "TMAXode" ~ "Maximum temperature",
                            var == "TMNode" ~ "Average temperature",
-                           var == "TAMPode" ~ "Temperature amplitude")) %>%
+                           var == "TAMPode" ~ "Temperature amplitude",
+                           var == "GDDjour" ~ "GDD daily",
+                           var == "GDDacc" ~ "GDD cumulated",
+                           var == "GDDbound" ~ "GDD bounded")) %>%
   mutate(time_lag_1 = as.numeric(sub('.*\\_', '', term)), time_lag_2 = as.numeric(stringr::str_match( term, '([^_]+)(?:_[^_]+){1}$')[,2])) %>%
   arrange(var, indicator, time_lag_1, time_lag_2) %>%
   rename(correlation = estimate) %>%
@@ -37,10 +40,10 @@ univ_glmm_temporal_ode <- glmm_univ_presence %>%
   nest(-c(indicator,var))
 
 plots_univ_glmm_temporal_ode <- univ_glmm_temporal_ode %>%
-  arrange(rev(indicator),factor(var, levels = c("RFDode","TMNode","TMINode","TMAXode","TAMPode"))) %>%
+  arrange(rev(indicator),factor(var, levels = c("RFDode","TMNode","TMINode","TMAXode","TAMPode","GDDjour","GDDacc","GDDbound"))) %>%
   mutate(univ_temporal = pmap(list(data,indicator), ~fun_ccm_plot2(correlation_df = ..1, var = ..1$label[1], time_frame = 1, indicator = ..2, metric_name = "glmm"))) %>%
   nest(-indicator) %>%
-  mutate(univ_temporal = map(data, ~wrap_plots(.x$univ_temporal, nrow = 1, ncol = 5))) %>%
+  mutate(univ_temporal = map(data, ~wrap_plots(.x$univ_temporal, nrow = 1, ncol = 8))) %>%
   #mutate(univ_temporal = pmap(list(univ_temporal,species,country,indicator), ~..1 + plot_annotation(title = paste(..2,..3,..4, sep = " - "), subtitle = paste("CCM using spearman coefficient"), caption = "Only significant results (pval <= 0.05) are displayed (non-signficant results are greyed out)"))) %>%
   dplyr::select(-data)
 

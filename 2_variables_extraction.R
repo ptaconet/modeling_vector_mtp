@@ -264,7 +264,32 @@ HVG2 <- left_join(HVG2,pieges_proj) %>%
   
   meteo <- meteo_ode %>%
     rename(RFDode = precipitations, TMINode = tmin, TMAXode = tmax, TMNode = tmean, TAMPode = tamp) %>%
-    filter(!is.na(RFDode), !is.na(TMINode), !is.na(TMAXode), !is.na(TMNode), !is.na(TAMPode))
+    filter(!is.na(RFDode), !is.na(TMINode), !is.na(TMAXode), !is.na(TMNode), !is.na(TAMPode)) %>%
+    mutate(TMINode_GDD = ifelse(TMINode>11, TMINode, 11),TMAXode_GDD = case_when(TMAXode<11~11, TMAXode==11~11, TMAXode==30~30, 11<TMAXode & TMAXode<30~TMAXode, TMAXode>30~30), GDDjour=(TMAXode_GDD+TMINode_GDD)/2-11 )# Ajout du GDD par jour
+  
+  meteo$GDDacc<-NA
+  meteo$GDDbound<-NA
+  i<-1
+  ## calcul GDD accumulé et limité à 1350 depuis 1e janvuer
+  while (i<=nrow(meteo)){
+    date<-meteo$date[i]
+    if (date<"2023-01-01"){
+      meteo$GDDacc[i]<-NA
+      meteo$GDDbound[i]<-NA
+    }
+    else{
+      gdd<-subset(meteo, meteo$date>="2023-01-01"& meteo$date<=meteo$date[i])
+      gdd_acc<-sum(gdd$GDDjour)
+      meteo$GDDacc[i]<-gdd_acc
+      if (gdd_acc<=1350){
+        meteo$GDDbound[i]<-gdd_acc}
+      else{
+        meteo$GDDbound[i]<-meteo$GDDbound[i-1]-meteo$GDDjour[i]
+      }
+    }
+    i<-i+1
+  }
+  
   
   df_releves_pieges2 <- df_releves_pieges %>%
     #mutate(DATE_POSE = parse_date(DATE_POSE,"%d/%m/%Y")) %>%
@@ -319,7 +344,10 @@ HVG2 <- left_join(HVG2,pieges_proj) %>%
     bind_rows(fun_summarize_week(df_meteo_pieges2,"TMINode")) %>%
     bind_rows(fun_summarize_week(df_meteo_pieges2,"TMAXode")) %>%
     bind_rows(fun_summarize_week(df_meteo_pieges2,"TMNode")) %>%
-    bind_rows(fun_summarize_week(df_meteo_pieges2,"TAMPode"))
+    bind_rows(fun_summarize_week(df_meteo_pieges2,"TAMPode"))%>%
+    bind_rows(fun_summarize_week(df_meteo_pieges2,"GDDjour"))%>%
+    bind_rows(fun_summarize_week(df_meteo_pieges2,"GDDacc"))%>%
+    bind_rows(fun_summarize_week(df_meteo_pieges2,"GDDbound"))
   
   # function to create the data.frame for CCM
   fun_ccm_df <- function(df_timeseries, varr, function_to_apply){
@@ -357,16 +385,21 @@ HVG2 <- left_join(HVG2,pieges_proj) %>%
   df_meteo_pieges_summ_wide3 <- fun_ccm_df(df_meteo_pieges_summ,"TMAXode","mean")
   df_meteo_pieges_summ_wide4 <- fun_ccm_df(df_meteo_pieges_summ,"TMNode","mean")
   df_meteo_pieges_summ_wide5 <- fun_ccm_df(df_meteo_pieges_summ,"TAMPode","mean")
+  df_meteo_pieges_summ_wide6 <- fun_ccm_df(df_meteo_pieges_summ,"GDDjour","sum")
+  df_meteo_pieges_summ_wide7 <- fun_ccm_df(df_meteo_pieges_summ,"GDDacc","mean")
+  df_meteo_pieges_summ_wide8 <- fun_ccm_df(df_meteo_pieges_summ,"GDDbound","mean")
+  
   
   df_meteo_pieges_summ_wide_ode <- df_meteo_pieges_summ_wide1 %>%
     left_join(df_meteo_pieges_summ_wide2) %>%
     left_join(df_meteo_pieges_summ_wide3) %>%
     left_join(df_meteo_pieges_summ_wide4) %>%
-    left_join(df_meteo_pieges_summ_wide5)
+    left_join(df_meteo_pieges_summ_wide5)%>%
+    left_join(df_meteo_pieges_summ_wide6)%>%
+    left_join(df_meteo_pieges_summ_wide7)%>%
+    left_join(df_meteo_pieges_summ_wide8)
   
-  
-  
-  
+
   
   ## données temporelles (météo France)
   
@@ -596,95 +629,95 @@ df_microclim <- df_releves_pieges %>%
   left_join(df_microclim) %>%
   dplyr::select(-contains("min_date"))
 
-# fill NA values (num_session 1 and 2) with meteofrance data
+### fill NA values (num_session 1 and 2) with meteofrance data
 
-meteo_meteofrance$date = as.Date(meteo_meteofrance$date)
-
-df_microclim2 <-  df_releves_pieges %>%
-  dplyr::select(ID_PIEGE, DATE_POSE, DATE_COLLECTE, ID_COLLECTE) %>%
-  mutate(TMIN_collection=NA, TMAX_collection=NA, TMEAN_collection=NA, RHMIN_collection=NA, RHMAX_collection=NA, RHMEAN_collection=NA,
-         TMEAN_24h_prec=NA, TMIN_24h_prec=NA, TMAX_24h_prec=NA, RHMEAN_24h_prec=NA,RHMIN_24h_prec=NA, RHMAX_24h_prec=NA,
-         TMEAN_48h_prec=NA, TMIN_48h_prec=NA, TMAX_48h_prec=NA, RHMEAN_48h_prec=NA, RHMIN_48h_prec=NA, RHMAX_48h_prec=NA,
-         TMEAN_1s_prec=NA, TMIN_1s_prec=NA, TMAX_1s_prec=NA, RHMEAN_1s_prec=NA, RHMIN_1s_prec=NA, RHMAX_1s_prec=NA,
-         TMEAN_2s_prec=NA, TMIN_2s_prec=NA, TMAX_2s_prec=NA, RHMEAN_2s_prec=NA, RHMIN_2s_prec=NA, RHMAX_2s_prec=NA,
-         TMEAN_3s_prec=NA, TMIN_3s_prec=NA, TMAX_3s_prec=NA, RHMEAN_3s_prec=NA, RHMIN_3s_prec=NA, RHMAX_3s_prec=NA,
-         TMEAN_4s_prec=NA, TMIN_4s_prec=NA, TMAX_4s_prec=NA, RHMEAN_4s_prec=NA, RHMIN_4s_prec=NA, RHMAX_4s_prec=NA,
-         TMEAN_5s_prec=NA, TMIN_5s_prec=NA, TMAX_5s_prec=NA, RHMEAN_5s_prec=NA, RHMIN_5s_prec=NA, RHMAX_5s_prec=NA,
-         TMEAN_6s_prec=NA, TMIN_6s_prec=NA, TMAX_6s_prec=NA, RHMEAN_6s_prec=NA, RHMIN_6s_prec=NA, RHMAX_6s_prec=NA)
-
-
-for(i in 1:nrow(df_microclim2)){
-  
-  df_microclim2$TMIN_collection[i] <- min(meteo_meteofrance$tmin[which(meteo_meteofrance$date >= df_microclim2$DATE_POSE[i] & meteo_meteofrance$date <= df_microclim2$DATE_COLLECTE[i])])
-  df_microclim2$TMAX_collection[i] <- max(meteo_meteofrance$tmax[which(meteo_meteofrance$date >= df_microclim2$DATE_POSE[i] & meteo_meteofrance$date <= df_microclim2$DATE_COLLECTE[i])])
-  df_microclim2$TMEAN_collection[i] <- mean(meteo_meteofrance$tmean[which(meteo_meteofrance$date >= df_microclim2$DATE_POSE[i] & meteo_meteofrance$date <= df_microclim2$DATE_COLLECTE[i])])
-  df_microclim2$RHMIN_collection[i] <- min(meteo_meteofrance$rh[which(meteo_meteofrance$date >= df_microclim2$DATE_POSE[i] & meteo_meteofrance$date <= df_microclim2$DATE_COLLECTE[i])])
-  df_microclim2$RHMAX_collection[i] <- max(meteo_meteofrance$rh[which(meteo_meteofrance$date >= df_microclim2$DATE_POSE[i] & meteo_meteofrance$date <= df_microclim2$DATE_COLLECTE[i])])
-  df_microclim2$RHMEAN_collection[i] <- mean(meteo_meteofrance$rh[which(meteo_meteofrance$date >= df_microclim2$DATE_POSE[i] & meteo_meteofrance$date <= df_microclim2$DATE_COLLECTE[i])])
-  
-  df_microclim2$TMIN_24h_prec[i] <- min(meteo_meteofrance$tmin[which(meteo_meteofrance$date >= df_microclim2$DATE_POSE[i]-1 & meteo_meteofrance$date <= df_microclim2$DATE_POSE[i])])
-  df_microclim2$TMAX_24h_prec[i] <- max(meteo_meteofrance$tmax[which(meteo_meteofrance$date >= df_microclim2$DATE_POSE[i]-1 & meteo_meteofrance$date <= df_microclim2$DATE_POSE[i])])
-  df_microclim2$TMEAN_24h_prec[i] <- mean(meteo_meteofrance$tmean[which(meteo_meteofrance$date >= df_microclim2$DATE_POSE[i]-1 & meteo_meteofrance$date <= df_microclim2$DATE_POSE[i])])
-  df_microclim2$RHMIN_24h_prec[i] <- min(meteo_meteofrance$rh[which(meteo_meteofrance$date >= df_microclim2$DATE_POSE[i]-1 & meteo_meteofrance$date <= df_microclim2$DATE_POSE[i])])
-  df_microclim2$RHMAX_24h_prec[i] <- max(meteo_meteofrance$rh[which(meteo_meteofrance$date >= df_microclim2$DATE_POSE[i]-1 & meteo_meteofrance$date <= df_microclim2$DATE_POSE[i])])
-  df_microclim2$RHMEAN_24h_prec[i] <- mean(meteo_meteofrance$rh[which(meteo_meteofrance$date >= df_microclim2$DATE_POSE[i]-1 & meteo_meteofrance$date <= df_microclim2$DATE_POSE[i])])
-  
-  df_microclim2$TMIN_48h_prec[i] <- min(meteo_meteofrance$tmin[which(meteo_meteofrance$date >= df_microclim2$DATE_POSE[i]-2 & meteo_meteofrance$date <= df_microclim2$DATE_POSE[i])])
-  df_microclim2$TMAX_48h_prec[i] <- max(meteo_meteofrance$tmax[which(meteo_meteofrance$date >= df_microclim2$DATE_POSE[i]-2 & meteo_meteofrance$date <= df_microclim2$DATE_POSE[i])])
-  df_microclim2$TMEAN_48h_prec[i] <- mean(meteo_meteofrance$tmean[which(meteo_meteofrance$date >= df_microclim2$DATE_POSE[i]-2 & meteo_meteofrance$date <= df_microclim2$DATE_POSE[i])])
-  df_microclim2$RHMIN_48h_prec[i] <- min(meteo_meteofrance$rh[which(meteo_meteofrance$date >= df_microclim2$DATE_POSE[i]-2 & meteo_meteofrance$date <= df_microclim2$DATE_POSE[i])])
-  df_microclim2$RHMAX_48h_prec[i] <- max(meteo_meteofrance$rh[which(meteo_meteofrance$date >= df_microclim2$DATE_POSE[i]-2 & meteo_meteofrance$date <= df_microclim2$DATE_POSE[i])])
-  df_microclim2$RHMEAN_48h_prec[i] <- mean(meteo_meteofrance$rh[which(meteo_meteofrance$date >= df_microclim2$DATE_POSE[i]-2 & meteo_meteofrance$date <= df_microclim2$DATE_POSE[i])])
-  
-  df_microclim2$TMIN_1s_prec[i] <- min(meteo_meteofrance$tmin[which(meteo_meteofrance$date >= df_microclim2$DATE_POSE[i]-1*7 & meteo_meteofrance$date <= df_microclim2$DATE_POSE[i])])
-  df_microclim2$TMAX_1s_prec[i] <- max(meteo_meteofrance$tmax[which(meteo_meteofrance$date >= df_microclim2$DATE_POSE[i]-1*7 & meteo_meteofrance$date <= df_microclim2$DATE_POSE[i])])
-  df_microclim2$TMEAN_1s_prec[i] <- mean(meteo_meteofrance$tmean[which(meteo_meteofrance$date >= df_microclim2$DATE_POSE[i]-1*7 & meteo_meteofrance$date <= df_microclim2$DATE_POSE[i])])
-  df_microclim2$RHMIN_1s_prec[i] <- min(meteo_meteofrance$rh[which(meteo_meteofrance$date >= df_microclim2$DATE_POSE[i]-1*7 & meteo_meteofrance$date <= df_microclim2$DATE_POSE[i])])
-  df_microclim2$RHMAX_1s_prec[i] <- max(meteo_meteofrance$rh[which(meteo_meteofrance$date >= df_microclim2$DATE_POSE[i]-1*7 & meteo_meteofrance$date <= df_microclim2$DATE_POSE[i])])
-  df_microclim2$RHMEAN_1s_prec[i] <- mean(meteo_meteofrance$rh[which(meteo_meteofrance$date >= df_microclim2$DATE_POSE[i]-1*7 & meteo_meteofrance$date <= df_microclim2$DATE_POSE[i])])
-  
-  df_microclim2$TMIN_2s_prec[i] <- min(meteo_meteofrance$tmin[which(meteo_meteofrance$date >= df_microclim2$DATE_POSE[i]-2*7 & meteo_meteofrance$date <= df_microclim2$DATE_POSE[i])])
-  df_microclim2$TMAX_2s_prec[i] <- max(meteo_meteofrance$tmax[which(meteo_meteofrance$date >= df_microclim2$DATE_POSE[i]-2*7 & meteo_meteofrance$date <= df_microclim2$DATE_POSE[i])])
-  df_microclim2$TMEAN_2s_prec[i] <- mean(meteo_meteofrance$tmean[which(meteo_meteofrance$date >= df_microclim2$DATE_POSE[i]-2*7 & meteo_meteofrance$date <= df_microclim2$DATE_POSE[i])])
-  df_microclim2$RHMIN_2s_prec[i] <- min(meteo_meteofrance$rh[which(meteo_meteofrance$date >= df_microclim2$DATE_POSE[i]-2*7 & meteo_meteofrance$date <= df_microclim2$DATE_POSE[i])])
-  df_microclim2$RHMAX_2s_prec[i] <- max(meteo_meteofrance$rh[which(meteo_meteofrance$date >= df_microclim2$DATE_POSE[i]-2*7 & meteo_meteofrance$date <= df_microclim2$DATE_POSE[i])])
-  df_microclim2$RHMEAN_2s_prec[i] <- mean(meteo_meteofrance$rh[which(meteo_meteofrance$date >= df_microclim2$DATE_POSE[i]-2*7 & meteo_meteofrance$date <= df_microclim2$DATE_POSE[i])])
-  
-  df_microclim2$TMIN_3s_prec[i] <- min(meteo_meteofrance$tmin[which(meteo_meteofrance$date >= df_microclim2$DATE_POSE[i]-3*7 & meteo_meteofrance$date <= df_microclim2$DATE_POSE[i])])
-  df_microclim2$TMAX_3s_prec[i] <- max(meteo_meteofrance$tmax[which(meteo_meteofrance$date >= df_microclim2$DATE_POSE[i]-3*7 & meteo_meteofrance$date <= df_microclim2$DATE_POSE[i])])
-  df_microclim2$TMEAN_3s_prec[i] <- mean(meteo_meteofrance$tmean[which(meteo_meteofrance$date >= df_microclim2$DATE_POSE[i]-3*7 & meteo_meteofrance$date <= df_microclim2$DATE_POSE[i])])
-  df_microclim2$RHMIN_3s_prec[i] <- min(meteo_meteofrance$rh[which(meteo_meteofrance$date >= df_microclim2$DATE_POSE[i]-3*7 & meteo_meteofrance$date <= df_microclim2$DATE_POSE[i])])
-  df_microclim2$RHMAX_3s_prec[i] <- max(meteo_meteofrance$rh[which(meteo_meteofrance$date >= df_microclim2$DATE_POSE[i]-3*7 & meteo_meteofrance$date <= df_microclim2$DATE_POSE[i])])
-  df_microclim2$RHMEAN_3s_prec[i] <- mean(meteo_meteofrance$rh[which(meteo_meteofrance$date >= df_microclim2$DATE_POSE[i]-3*7 & meteo_meteofrance$date <= df_microclim2$DATE_POSE[i])])
-  
-  df_microclim2$TMIN_4s_prec[i] <- min(meteo_meteofrance$tmin[which(meteo_meteofrance$date >= df_microclim2$DATE_POSE[i]-4*7 & meteo_meteofrance$date <= df_microclim2$DATE_POSE[i])])
-  df_microclim2$TMAX_4s_prec[i] <- max(meteo_meteofrance$tmax[which(meteo_meteofrance$date >= df_microclim2$DATE_POSE[i]-4*7 & meteo_meteofrance$date <= df_microclim2$DATE_POSE[i])])
-  df_microclim2$TMEAN_4s_prec[i] <- mean(meteo_meteofrance$tmean[which(meteo_meteofrance$date >= df_microclim2$DATE_POSE[i]-4*7 & meteo_meteofrance$date <= df_microclim2$DATE_POSE[i])])
-  df_microclim2$RHMIN_4s_prec[i] <- min(meteo_meteofrance$rh[which(meteo_meteofrance$date >= df_microclim2$DATE_POSE[i]-4*7 & meteo_meteofrance$date <= df_microclim2$DATE_POSE[i])])
-  df_microclim2$RHMAX_4s_prec[i] <- max(meteo_meteofrance$rh[which(meteo_meteofrance$date >= df_microclim2$DATE_POSE[i]-4*7 & meteo_meteofrance$date <= df_microclim2$DATE_POSE[i])])
-  df_microclim2$RHMEAN_4s_prec[i] <- mean(meteo_meteofrance$rh[which(meteo_meteofrance$date >= df_microclim2$DATE_POSE[i]-4*7 & meteo_meteofrance$date <= df_microclim2$DATE_POSE[i])])
-  
-  df_microclim2$TMIN_5s_prec[i] <- min(meteo_meteofrance$tmin[which(meteo_meteofrance$date >= df_microclim2$DATE_POSE[i]-5*7 & meteo_meteofrance$date <= df_microclim2$DATE_POSE[i])])
-  df_microclim2$TMAX_5s_prec[i] <- max(meteo_meteofrance$tmax[which(meteo_meteofrance$date >= df_microclim2$DATE_POSE[i]-5*7 & meteo_meteofrance$date <= df_microclim2$DATE_POSE[i])])
-  df_microclim2$TMEAN_5s_prec[i] <- mean(meteo_meteofrance$tmean[which(meteo_meteofrance$date >= df_microclim2$DATE_POSE[i]-5*7 & meteo_meteofrance$date <= df_microclim2$DATE_POSE[i])])
-  df_microclim2$RHMIN_5s_prec[i] <- min(meteo_meteofrance$rh[which(meteo_meteofrance$date >= df_microclim2$DATE_POSE[i]-5*7 & meteo_meteofrance$date <= df_microclim2$DATE_POSE[i])])
-  df_microclim2$RHMAX_5s_prec[i] <- max(meteo_meteofrance$rh[which(meteo_meteofrance$date >= df_microclim2$DATE_POSE[i]-5*7 & meteo_meteofrance$date <= df_microclim2$DATE_POSE[i])])
-  df_microclim2$RHMEAN_5s_prec[i] <- mean(meteo_meteofrance$rh[which(meteo_meteofrance$date >= df_microclim2$DATE_POSE[i]-5*7 & meteo_meteofrance$date <= df_microclim2$DATE_POSE[i])])
-  
-  df_microclim2$TMIN_6s_prec[i] <- min(meteo_meteofrance$tmin[which(meteo_meteofrance$date >= df_microclim2$DATE_POSE[i]-6*7 & meteo_meteofrance$date <= df_microclim2$DATE_POSE[i])])
-  df_microclim2$TMAX_6s_prec[i] <- max(meteo_meteofrance$tmax[which(meteo_meteofrance$date >= df_microclim2$DATE_POSE[i]-6*7 & meteo_meteofrance$date <= df_microclim2$DATE_POSE[i])])
-  df_microclim2$TMEAN_6s_prec[i] <- mean(meteo_meteofrance$tmean[which(meteo_meteofrance$date >= df_microclim2$DATE_POSE[i]-6*7 & meteo_meteofrance$date <= df_microclim2$DATE_POSE[i])])
-  df_microclim2$RHMIN_6s_prec[i] <- min(meteo_meteofrance$rh[which(meteo_meteofrance$date >= df_microclim2$DATE_POSE[i]-6*7 & meteo_meteofrance$date <= df_microclim2$DATE_POSE[i])])
-  df_microclim2$RHMAX_6s_prec[i] <- max(meteo_meteofrance$rh[which(meteo_meteofrance$date >= df_microclim2$DATE_POSE[i]-6*7 & meteo_meteofrance$date <= df_microclim2$DATE_POSE[i])])
-  df_microclim2$RHMEAN_6s_prec[i] <- mean(meteo_meteofrance$rh[which(meteo_meteofrance$date >= df_microclim2$DATE_POSE[i]-6*7 & meteo_meteofrance$date <= df_microclim2$DATE_POSE[i])])
-  
-  
-}
-
-df_microclim <- dplyr::rows_patch(df_microclim, df_microclim2, by = "ID_COLLECTE")
-
-df_microclim <- df_microclim  %>%
-  dplyr::select(-c("DATE_POSE", "DATE_COLLECTE"))
+# meteo_meteofrance$date = as.Date(meteo_meteofrance$date)
+# 
+# df_microclim2 <-  df_releves_pieges %>%
+#   dplyr::select(ID_PIEGE, DATE_POSE, DATE_COLLECTE, ID_COLLECTE) %>%
+#   mutate(TMIN_collection=NA, TMAX_collection=NA, TMEAN_collection=NA, RHMIN_collection=NA, RHMAX_collection=NA, RHMEAN_collection=NA,
+#          TMEAN_24h_prec=NA, TMIN_24h_prec=NA, TMAX_24h_prec=NA, RHMEAN_24h_prec=NA,RHMIN_24h_prec=NA, RHMAX_24h_prec=NA,
+#          TMEAN_48h_prec=NA, TMIN_48h_prec=NA, TMAX_48h_prec=NA, RHMEAN_48h_prec=NA, RHMIN_48h_prec=NA, RHMAX_48h_prec=NA,
+#          TMEAN_1s_prec=NA, TMIN_1s_prec=NA, TMAX_1s_prec=NA, RHMEAN_1s_prec=NA, RHMIN_1s_prec=NA, RHMAX_1s_prec=NA,
+#          TMEAN_2s_prec=NA, TMIN_2s_prec=NA, TMAX_2s_prec=NA, RHMEAN_2s_prec=NA, RHMIN_2s_prec=NA, RHMAX_2s_prec=NA,
+#          TMEAN_3s_prec=NA, TMIN_3s_prec=NA, TMAX_3s_prec=NA, RHMEAN_3s_prec=NA, RHMIN_3s_prec=NA, RHMAX_3s_prec=NA,
+#          TMEAN_4s_prec=NA, TMIN_4s_prec=NA, TMAX_4s_prec=NA, RHMEAN_4s_prec=NA, RHMIN_4s_prec=NA, RHMAX_4s_prec=NA,
+#          TMEAN_5s_prec=NA, TMIN_5s_prec=NA, TMAX_5s_prec=NA, RHMEAN_5s_prec=NA, RHMIN_5s_prec=NA, RHMAX_5s_prec=NA,
+#          TMEAN_6s_prec=NA, TMIN_6s_prec=NA, TMAX_6s_prec=NA, RHMEAN_6s_prec=NA, RHMIN_6s_prec=NA, RHMAX_6s_prec=NA)
+# 
+# 
+# for(i in 1:nrow(df_microclim2)){
+#   
+#   df_microclim2$TMIN_collection[i] <- min(meteo_meteofrance$tmin[which(meteo_meteofrance$date >= df_microclim2$DATE_POSE[i] & meteo_meteofrance$date <= df_microclim2$DATE_COLLECTE[i])])
+#   df_microclim2$TMAX_collection[i] <- max(meteo_meteofrance$tmax[which(meteo_meteofrance$date >= df_microclim2$DATE_POSE[i] & meteo_meteofrance$date <= df_microclim2$DATE_COLLECTE[i])])
+#   df_microclim2$TMEAN_collection[i] <- mean(meteo_meteofrance$tmean[which(meteo_meteofrance$date >= df_microclim2$DATE_POSE[i] & meteo_meteofrance$date <= df_microclim2$DATE_COLLECTE[i])])
+#   df_microclim2$RHMIN_collection[i] <- min(meteo_meteofrance$rh[which(meteo_meteofrance$date >= df_microclim2$DATE_POSE[i] & meteo_meteofrance$date <= df_microclim2$DATE_COLLECTE[i])])
+#   df_microclim2$RHMAX_collection[i] <- max(meteo_meteofrance$rh[which(meteo_meteofrance$date >= df_microclim2$DATE_POSE[i] & meteo_meteofrance$date <= df_microclim2$DATE_COLLECTE[i])])
+#   df_microclim2$RHMEAN_collection[i] <- mean(meteo_meteofrance$rh[which(meteo_meteofrance$date >= df_microclim2$DATE_POSE[i] & meteo_meteofrance$date <= df_microclim2$DATE_COLLECTE[i])])
+#   
+#   df_microclim2$TMIN_24h_prec[i] <- min(meteo_meteofrance$tmin[which(meteo_meteofrance$date >= df_microclim2$DATE_POSE[i]-1 & meteo_meteofrance$date <= df_microclim2$DATE_POSE[i])])
+#   df_microclim2$TMAX_24h_prec[i] <- max(meteo_meteofrance$tmax[which(meteo_meteofrance$date >= df_microclim2$DATE_POSE[i]-1 & meteo_meteofrance$date <= df_microclim2$DATE_POSE[i])])
+#   df_microclim2$TMEAN_24h_prec[i] <- mean(meteo_meteofrance$tmean[which(meteo_meteofrance$date >= df_microclim2$DATE_POSE[i]-1 & meteo_meteofrance$date <= df_microclim2$DATE_POSE[i])])
+#   df_microclim2$RHMIN_24h_prec[i] <- min(meteo_meteofrance$rh[which(meteo_meteofrance$date >= df_microclim2$DATE_POSE[i]-1 & meteo_meteofrance$date <= df_microclim2$DATE_POSE[i])])
+#   df_microclim2$RHMAX_24h_prec[i] <- max(meteo_meteofrance$rh[which(meteo_meteofrance$date >= df_microclim2$DATE_POSE[i]-1 & meteo_meteofrance$date <= df_microclim2$DATE_POSE[i])])
+#   df_microclim2$RHMEAN_24h_prec[i] <- mean(meteo_meteofrance$rh[which(meteo_meteofrance$date >= df_microclim2$DATE_POSE[i]-1 & meteo_meteofrance$date <= df_microclim2$DATE_POSE[i])])
+#   
+#   df_microclim2$TMIN_48h_prec[i] <- min(meteo_meteofrance$tmin[which(meteo_meteofrance$date >= df_microclim2$DATE_POSE[i]-2 & meteo_meteofrance$date <= df_microclim2$DATE_POSE[i])])
+#   df_microclim2$TMAX_48h_prec[i] <- max(meteo_meteofrance$tmax[which(meteo_meteofrance$date >= df_microclim2$DATE_POSE[i]-2 & meteo_meteofrance$date <= df_microclim2$DATE_POSE[i])])
+#   df_microclim2$TMEAN_48h_prec[i] <- mean(meteo_meteofrance$tmean[which(meteo_meteofrance$date >= df_microclim2$DATE_POSE[i]-2 & meteo_meteofrance$date <= df_microclim2$DATE_POSE[i])])
+#   df_microclim2$RHMIN_48h_prec[i] <- min(meteo_meteofrance$rh[which(meteo_meteofrance$date >= df_microclim2$DATE_POSE[i]-2 & meteo_meteofrance$date <= df_microclim2$DATE_POSE[i])])
+#   df_microclim2$RHMAX_48h_prec[i] <- max(meteo_meteofrance$rh[which(meteo_meteofrance$date >= df_microclim2$DATE_POSE[i]-2 & meteo_meteofrance$date <= df_microclim2$DATE_POSE[i])])
+#   df_microclim2$RHMEAN_48h_prec[i] <- mean(meteo_meteofrance$rh[which(meteo_meteofrance$date >= df_microclim2$DATE_POSE[i]-2 & meteo_meteofrance$date <= df_microclim2$DATE_POSE[i])])
+#   
+#   df_microclim2$TMIN_1s_prec[i] <- min(meteo_meteofrance$tmin[which(meteo_meteofrance$date >= df_microclim2$DATE_POSE[i]-1*7 & meteo_meteofrance$date <= df_microclim2$DATE_POSE[i])])
+#   df_microclim2$TMAX_1s_prec[i] <- max(meteo_meteofrance$tmax[which(meteo_meteofrance$date >= df_microclim2$DATE_POSE[i]-1*7 & meteo_meteofrance$date <= df_microclim2$DATE_POSE[i])])
+#   df_microclim2$TMEAN_1s_prec[i] <- mean(meteo_meteofrance$tmean[which(meteo_meteofrance$date >= df_microclim2$DATE_POSE[i]-1*7 & meteo_meteofrance$date <= df_microclim2$DATE_POSE[i])])
+#   df_microclim2$RHMIN_1s_prec[i] <- min(meteo_meteofrance$rh[which(meteo_meteofrance$date >= df_microclim2$DATE_POSE[i]-1*7 & meteo_meteofrance$date <= df_microclim2$DATE_POSE[i])])
+#   df_microclim2$RHMAX_1s_prec[i] <- max(meteo_meteofrance$rh[which(meteo_meteofrance$date >= df_microclim2$DATE_POSE[i]-1*7 & meteo_meteofrance$date <= df_microclim2$DATE_POSE[i])])
+#   df_microclim2$RHMEAN_1s_prec[i] <- mean(meteo_meteofrance$rh[which(meteo_meteofrance$date >= df_microclim2$DATE_POSE[i]-1*7 & meteo_meteofrance$date <= df_microclim2$DATE_POSE[i])])
+#   
+#   df_microclim2$TMIN_2s_prec[i] <- min(meteo_meteofrance$tmin[which(meteo_meteofrance$date >= df_microclim2$DATE_POSE[i]-2*7 & meteo_meteofrance$date <= df_microclim2$DATE_POSE[i])])
+#   df_microclim2$TMAX_2s_prec[i] <- max(meteo_meteofrance$tmax[which(meteo_meteofrance$date >= df_microclim2$DATE_POSE[i]-2*7 & meteo_meteofrance$date <= df_microclim2$DATE_POSE[i])])
+#   df_microclim2$TMEAN_2s_prec[i] <- mean(meteo_meteofrance$tmean[which(meteo_meteofrance$date >= df_microclim2$DATE_POSE[i]-2*7 & meteo_meteofrance$date <= df_microclim2$DATE_POSE[i])])
+#   df_microclim2$RHMIN_2s_prec[i] <- min(meteo_meteofrance$rh[which(meteo_meteofrance$date >= df_microclim2$DATE_POSE[i]-2*7 & meteo_meteofrance$date <= df_microclim2$DATE_POSE[i])])
+#   df_microclim2$RHMAX_2s_prec[i] <- max(meteo_meteofrance$rh[which(meteo_meteofrance$date >= df_microclim2$DATE_POSE[i]-2*7 & meteo_meteofrance$date <= df_microclim2$DATE_POSE[i])])
+#   df_microclim2$RHMEAN_2s_prec[i] <- mean(meteo_meteofrance$rh[which(meteo_meteofrance$date >= df_microclim2$DATE_POSE[i]-2*7 & meteo_meteofrance$date <= df_microclim2$DATE_POSE[i])])
+#   
+#   df_microclim2$TMIN_3s_prec[i] <- min(meteo_meteofrance$tmin[which(meteo_meteofrance$date >= df_microclim2$DATE_POSE[i]-3*7 & meteo_meteofrance$date <= df_microclim2$DATE_POSE[i])])
+#   df_microclim2$TMAX_3s_prec[i] <- max(meteo_meteofrance$tmax[which(meteo_meteofrance$date >= df_microclim2$DATE_POSE[i]-3*7 & meteo_meteofrance$date <= df_microclim2$DATE_POSE[i])])
+#   df_microclim2$TMEAN_3s_prec[i] <- mean(meteo_meteofrance$tmean[which(meteo_meteofrance$date >= df_microclim2$DATE_POSE[i]-3*7 & meteo_meteofrance$date <= df_microclim2$DATE_POSE[i])])
+#   df_microclim2$RHMIN_3s_prec[i] <- min(meteo_meteofrance$rh[which(meteo_meteofrance$date >= df_microclim2$DATE_POSE[i]-3*7 & meteo_meteofrance$date <= df_microclim2$DATE_POSE[i])])
+#   df_microclim2$RHMAX_3s_prec[i] <- max(meteo_meteofrance$rh[which(meteo_meteofrance$date >= df_microclim2$DATE_POSE[i]-3*7 & meteo_meteofrance$date <= df_microclim2$DATE_POSE[i])])
+#   df_microclim2$RHMEAN_3s_prec[i] <- mean(meteo_meteofrance$rh[which(meteo_meteofrance$date >= df_microclim2$DATE_POSE[i]-3*7 & meteo_meteofrance$date <= df_microclim2$DATE_POSE[i])])
+#   
+#   df_microclim2$TMIN_4s_prec[i] <- min(meteo_meteofrance$tmin[which(meteo_meteofrance$date >= df_microclim2$DATE_POSE[i]-4*7 & meteo_meteofrance$date <= df_microclim2$DATE_POSE[i])])
+#   df_microclim2$TMAX_4s_prec[i] <- max(meteo_meteofrance$tmax[which(meteo_meteofrance$date >= df_microclim2$DATE_POSE[i]-4*7 & meteo_meteofrance$date <= df_microclim2$DATE_POSE[i])])
+#   df_microclim2$TMEAN_4s_prec[i] <- mean(meteo_meteofrance$tmean[which(meteo_meteofrance$date >= df_microclim2$DATE_POSE[i]-4*7 & meteo_meteofrance$date <= df_microclim2$DATE_POSE[i])])
+#   df_microclim2$RHMIN_4s_prec[i] <- min(meteo_meteofrance$rh[which(meteo_meteofrance$date >= df_microclim2$DATE_POSE[i]-4*7 & meteo_meteofrance$date <= df_microclim2$DATE_POSE[i])])
+#   df_microclim2$RHMAX_4s_prec[i] <- max(meteo_meteofrance$rh[which(meteo_meteofrance$date >= df_microclim2$DATE_POSE[i]-4*7 & meteo_meteofrance$date <= df_microclim2$DATE_POSE[i])])
+#   df_microclim2$RHMEAN_4s_prec[i] <- mean(meteo_meteofrance$rh[which(meteo_meteofrance$date >= df_microclim2$DATE_POSE[i]-4*7 & meteo_meteofrance$date <= df_microclim2$DATE_POSE[i])])
+#   
+#   df_microclim2$TMIN_5s_prec[i] <- min(meteo_meteofrance$tmin[which(meteo_meteofrance$date >= df_microclim2$DATE_POSE[i]-5*7 & meteo_meteofrance$date <= df_microclim2$DATE_POSE[i])])
+#   df_microclim2$TMAX_5s_prec[i] <- max(meteo_meteofrance$tmax[which(meteo_meteofrance$date >= df_microclim2$DATE_POSE[i]-5*7 & meteo_meteofrance$date <= df_microclim2$DATE_POSE[i])])
+#   df_microclim2$TMEAN_5s_prec[i] <- mean(meteo_meteofrance$tmean[which(meteo_meteofrance$date >= df_microclim2$DATE_POSE[i]-5*7 & meteo_meteofrance$date <= df_microclim2$DATE_POSE[i])])
+#   df_microclim2$RHMIN_5s_prec[i] <- min(meteo_meteofrance$rh[which(meteo_meteofrance$date >= df_microclim2$DATE_POSE[i]-5*7 & meteo_meteofrance$date <= df_microclim2$DATE_POSE[i])])
+#   df_microclim2$RHMAX_5s_prec[i] <- max(meteo_meteofrance$rh[which(meteo_meteofrance$date >= df_microclim2$DATE_POSE[i]-5*7 & meteo_meteofrance$date <= df_microclim2$DATE_POSE[i])])
+#   df_microclim2$RHMEAN_5s_prec[i] <- mean(meteo_meteofrance$rh[which(meteo_meteofrance$date >= df_microclim2$DATE_POSE[i]-5*7 & meteo_meteofrance$date <= df_microclim2$DATE_POSE[i])])
+#   
+#   df_microclim2$TMIN_6s_prec[i] <- min(meteo_meteofrance$tmin[which(meteo_meteofrance$date >= df_microclim2$DATE_POSE[i]-6*7 & meteo_meteofrance$date <= df_microclim2$DATE_POSE[i])])
+#   df_microclim2$TMAX_6s_prec[i] <- max(meteo_meteofrance$tmax[which(meteo_meteofrance$date >= df_microclim2$DATE_POSE[i]-6*7 & meteo_meteofrance$date <= df_microclim2$DATE_POSE[i])])
+#   df_microclim2$TMEAN_6s_prec[i] <- mean(meteo_meteofrance$tmean[which(meteo_meteofrance$date >= df_microclim2$DATE_POSE[i]-6*7 & meteo_meteofrance$date <= df_microclim2$DATE_POSE[i])])
+#   df_microclim2$RHMIN_6s_prec[i] <- min(meteo_meteofrance$rh[which(meteo_meteofrance$date >= df_microclim2$DATE_POSE[i]-6*7 & meteo_meteofrance$date <= df_microclim2$DATE_POSE[i])])
+#   df_microclim2$RHMAX_6s_prec[i] <- max(meteo_meteofrance$rh[which(meteo_meteofrance$date >= df_microclim2$DATE_POSE[i]-6*7 & meteo_meteofrance$date <= df_microclim2$DATE_POSE[i])])
+#   df_microclim2$RHMEAN_6s_prec[i] <- mean(meteo_meteofrance$rh[which(meteo_meteofrance$date >= df_microclim2$DATE_POSE[i]-6*7 & meteo_meteofrance$date <= df_microclim2$DATE_POSE[i])])
+#   
+#   
+# }
+# 
+# df_microclim <- dplyr::rows_patch(df_microclim, df_microclim2, by = "ID_COLLECTE")
+# 
+# df_microclim <- df_microclim  %>%
+#   dplyr::select(-c("DATE_POSE", "DATE_COLLECTE"))
 
 ###### restructuration des tables
 

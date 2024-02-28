@@ -10,7 +10,9 @@ df_model <- df_model %>%
   mutate(PRES_ALBO = ifelse(NB_ALBO_TOT>0,"Presence","Absence")) %>%
   mutate(PRES_ALBO = fct_relevel(PRES_ALBO,c("Presence","Absence"))) %>%
   mutate(PRES_ALBO_NUMERIC = ifelse(NB_ALBO_TOT>0,1,0)) %>%
-  filter(!is.na(NB_ALBO_TOT))
+  filter(!is.na(NB_ALBO_TOT)) %>%
+   filter(!is.na(TMIN_collection),!is.na(RHMIN_24h_prec),!is.na(RHMAX_24h_prec))  %>%
+   mutate(RFSUM_collection=ifelse(RFSUM_collection>0.5,1,0))
 
 ##### select variables for presence models
 predictors_presence <- c("RFDode_5_6", "TMNode_0_0", "TMINode_2_2", "TMAXode_0_1", "TAMPode_5_5", "RHmf_2_2", "WINDmf_0_5",
@@ -122,8 +124,7 @@ predictors_abundance <- c("RFDode_6_6", "TMINode_2_2","TAMPode_3_5", "WINDmf_0_2
 
 df_model_abundance <- df_model %>%
   filter(NB_ALBO_TOT>0) %>%
-  dplyr::select("idpointdecapture", "ID_PIEGE", "num_session","ID_COLLECTE", "ZONE",  "TYPE_PIEGE", "LATITUDE", "LONGITUDE", "lieu",  "NB_ALBO_TOT", "PRES_ALBO", predictors_abundance)
-
+  dplyr::select("idpointdecapture", "ID_PIEGE", "num_session","ID_COLLECTE", "ZONE",  "TYPE_PIEGE", "LATITUDE", "LONGITUDE", "lieu",  "NB_ALBO_TOT", "PRES_ALBO",predictors_abundance)
 
 ## Modélisation avec RF
 
@@ -166,7 +167,7 @@ tr = trainControl(method="cv",
                   savePredictions = 'final')
 
 mod_abundance <- caret::train(x = df_model_abundance[,predictors_abundance], y = df_model_abundance$NB_ALBO_TOT, method = "ranger", tuneLength = 10, trControl = tr, metric = "MAE", maximize = FALSE,  preProcess = c("center","scale"),importance = "permutation", local.importance = "TRUE")
-#mod_abundace <- ffs(predictors = df_model_abundance[,predictors_abundance], response = df_model_abundance$NB_ALBO_TOT, method = "ranger", tuneLength = 10, trControl = tr, metric = "MAE", maximize = FALSE,  preProcess = c("center","scale"),importance = "permutation", local.importance = "TRUE")
+#mod_abundance <- ffs(predictors = df_model_abundance[,predictors_abundance], response = df_model_abundance$NB_ALBO_TOT, method = "ranger", tuneLength = 10, trControl = tr, metric = "MAE", maximize = FALSE,  preProcess = c("center","scale"),importance = "permutation", local.importance = "TRUE")
 
 df_model_abundance$rowIndex <- seq(1,nrow(df_model_abundance),1)
 
