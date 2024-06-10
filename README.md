@@ -1,7 +1,7 @@
 
 R scripts developed in the frame of the [V2MOC projet](https://envt.fr/actualites/focus-sur-le-projet-v2moc/) (*Impact de la végétalisation des villes sur le risque vectoriel chez l’Homme et les animaux*), as part the PhD thesis of Colombine Bartholomée (IRD, UMR MIVEGEC). 
 
-These script aim at modeling the spatio-temporal distribution and abundance of the mosquito *Aedes Albopictus* in the city of Montpellier (France) using multisource fine-scale data (entomological, meteorological, and landscape). 
+These scripts aim at modeling the spatio-temporal distribution and abundance of the mosquito *Aedes Albopictus* in the city of Montpellier (France) using multisource fine-scale data (entomological, meteorological, and landscape). 
 
 - `1_rawdata_preparation.R` : script to pre-process the raw data (cropping, filtering, etc.).
 - `2_variables_extraction.R` : script to generate the statistical variables for the models.
