@@ -317,7 +317,7 @@ HVG2 <- left_join(HVG2,pieges_proj) %>%
   
   fun_summarize_week <- function(df_meteo_pieges2,var_to_summarize){
     
-    if(grepl("RFD",var_to_summarize)){
+    if(grepl("RFD|GDDjour",var_to_summarize)){
       df_meteo_pieges2_summarize <- df_meteo_pieges2 %>%
         filter(var==var_to_summarize) %>%
         group_by(idpointdecapture,lag_n = lubridate::week(date)) %>%

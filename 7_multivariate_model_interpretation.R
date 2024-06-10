@@ -113,15 +113,29 @@ plot_validation_abundance <- ggplot() +
         axis.title.y = element_text(size = 8))
 
 
-# plot_validation_abundance <- df_cv_abundance %>%
-#   mutate(obs=exp(obs),pred=exp(pred)) %>%
-#   ggplot(aes(x=obs,y=pred, colour =as.factor(num_session))) +
-#   geom_point() + 
-#   #scale_x_sqrt(limits = c(0,100)) + 
-#   #scale_y_sqrt(limits = c(0,100)) + 
-#   theme_bw() + 
-#   geom_smooth(method = "lm", se = F) + 
-#   facet_wrap(~lieu , scales = 'free')
+plot_eval_abundance_model2 <- df_cv_abundance %>%
+     mutate(obs=exp(obs),pred=exp(pred)) %>%
+     mutate(num_session = as.character(num_session)) %>%
+     ggplot(aes(x=obs,y=pred, colour = num_session)) +
+     geom_point() +
+     #scale_x_sqrt(limits = c(0,100)) +
+     #scale_y_sqrt(limits = c(0,100)) +
+     theme_bw() +
+     geom_smooth(method = "lm", se = F) +
+     facet_wrap(~lieu , scales = 'free') + 
+  ggtitle("Predictive performance of the abundance model - by site and entomological survey")
+
+
+plot_eval_abundance_model2 <- df_cv_abundance %>%
+  mutate(obs=exp(obs),pred=exp(pred)) %>%
+  mutate(num_session = as.character(num_session)) %>%
+  ggplot(aes(x=obs,y=pred, colour = num_session)) +
+  geom_point() +
+  #scale_x_sqrt(limits = c(0,100)) +
+  #scale_y_sqrt(limits = c(0,100)) +
+  theme_bw() +
+  geom_smooth(method = "lm", se = F) +
+  ggtitle("Predictive performance of the abundance model - by entomological survey")
 
 
 plot_validation_abundance+plot_eval_abundance_model
