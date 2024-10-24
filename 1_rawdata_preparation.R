@@ -29,7 +29,7 @@ roi <- roi %>%
 vegetation <-  st_read("data/MMM_MMM_VegFine/MMM_MMM_VegFine.shp")
 occ_sol <-  st_read("data/FR010L2_MONTPELLIER_UA2018_v013/Data/FR010L2_MONTPELLIER_UA2018_v013.gpkg")
 pop <-  st_read("data/MMM_MMM_PopFine/MMM_MMM_PopFine.shp")
-filosofi <-  st_read("data/Filosofi2015_carreaux_200m_gpkg/Filosofi2015_carreaux_200m_metropole.gpkg")
+filosofi <-  st_read("data/Filosofi2017_carreaux_200m_gpkg/Filosofi2017_carreaux_200m_met.gpkg")
 impermeabilite <- merge(raster("data/IMD_2018_010m_fr_03035_v020/DATA/IMD_2018_010m_E38N23_03035_v020.tif"),raster("data/IMD_2018_010m_fr_03035_v020/DATA/IMD_2018_010m_E38N22_03035_v020.tif"))
 temp_diurne <-  raster("data/MMM_MMM_ThermoSatelliteJour/image_satellite_jour_LANDSAT8_22072019.tif")
 temp_nocturne <-  raster("data/MMM_MMM_ThermoSatelliteNuit/image_satellite_nuit_ASTER_06072015.tif")

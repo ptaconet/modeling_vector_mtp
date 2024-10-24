@@ -10,6 +10,9 @@ library(lubridate)
 pieges <- st_read("localisation_piege_provisoire.gpkg") %>% 
   filter(TYPE_PIEGE == 'bg-sentinel')
 
+# pieges <- st_read("P02_TRAPS_LOCATION.gpkg") %>% 
+#   filter(TYPE_PIEGE == 'bg-sentinel')
+
 df_releves_pieges_raw <- read.csv("BG_labo2.csv", stringsAsFactors = F, sep = ";") %>%
   mutate(HEURE_COLLECTE = ifelse(is.na(HEURE_COLLECTE),"10:00",HEURE_COLLECTE)) %>%
   rename(ID_COLLECTE_STRING = ID_COLLECTE) %>%
@@ -193,7 +196,8 @@ HVG2 <- left_join(HVG2,pieges_proj) %>%
     st_drop_geometry() %>%
     group_by(buffer,ID_PIEGE) %>%
     summarise(BATN = n(), BATH_mn = mean(hauteur,na.rm=T), BATH_sd = sd(hauteur, na.rm = T), BATH_min = min(hauteur, na.rm = T), BATH_max = max(hauteur, na.rm = T)) %>%
-    complete(buffer, ID_PIEGE,  fill = list(BATN = 0, BATH_mn = NA, BATH_sd = NA, BATH_min = NA, BATH_max = NA)) %>%
+    ungroup() %>%
+    tidyr::complete(buffer, ID_PIEGE,  fill = list(BATN = 0, BATH_mn = NA, BATH_sd = NA, BATH_min = NA, BATH_max = NA)) %>%
     as_tibble()
   
   
@@ -219,6 +223,7 @@ HVG2 <- left_join(HVG2,pieges_proj) %>%
     mutate(buffer = as.numeric(buffer)) %>%
     group_by(buffer,ID_PIEGE) %>%
     summarise(BATS_sum = sum(aire,na.rm=T), BATS_mn = mean(aire,na.rm=T)) %>%
+    ungroup() %>%
     complete(buffer, ID_PIEGE,  fill = list(BATS_sum = 0, BATS_mn = 0)) %>%
     as_tibble()
   
@@ -233,6 +238,7 @@ HVG2 <- left_join(HVG2,pieges_proj) %>%
     st_drop_geometry() %>%
     group_by(buffer,ID_PIEGE) %>%
     summarise(sum = sum(pop_2016), sd = sd(pop_2016)) %>%
+    ungroup() %>%
     complete(buffer, ID_PIEGE,  fill = list(sum = 0, sd = 0)) %>%
     as_tibble()
   
@@ -246,6 +252,7 @@ HVG2 <- left_join(HVG2,pieges_proj) %>%
     st_drop_geometry() %>%
     group_by(buffer,ID_PIEGE) %>%
     summarise(nb = n(), sum_vol = sum(V_EAU)) %>%
+    ungroup() %>%
     complete(buffer, ID_PIEGE,  fill = list(nb = 0, sum_vol = 0)) %>%
     as_tibble()
   
@@ -462,7 +469,7 @@ HVG2 <- left_join(HVG2,pieges_proj) %>%
 
 ## rainfall during collection
 
-df_rainfall <- read.csv('/home/ptaconet/modeling_vector_mtp/data/Donnees_Climato_Dept34/Donnees/Station_202_20210526_H.csv', sep = ";",stringsAsFactors = F, na.strings = "", dec = ",", col.names = c('date',"heure","precipitations","temperatures")) %>%
+df_rainfall <- read.csv('data/Donnees_Climato_Dept34/Donnees/Station_202_20210526_H.csv', sep = ";",stringsAsFactors = F, na.strings = "", dec = ",", col.names = c('date',"heure","precipitations","temperatures")) %>%
   mutate(date = parse_date_time(date,"%d/%m/%Y")) %>%
   mutate(date_time = ymd_hms(paste(date,heure)))
 
@@ -879,3 +886,9 @@ df_model <- df_meteo_pieges_summ_wide_ode %>%
   relocate(num_session, ZONE, TYPE_PIEGE, LATITUDE, LONGITUDE, lieu, .after = DATE_COLLECTE)
   
 write.csv(df_model,"df_model.csv")
+
+# 
+# MeasurementOrFact_raw <- df_model %>%
+#   dplyr::select(ID_COLLECTE_STRING,contains("lsm_c_pland_LCG_50"),contains("lsm_c_pland_LCG_100"),contains("_collection"),contains("24h"),contains("48h"),"RFDode_0_4","TMINode_0_4","TMAXode_0_4","WINDmf_0_4","RHmf_0_4")
+# 
+# write.csv(MeasurementOrFact_raw,"MeasurementOrFact_raw.csv", row.names = F)
