@@ -150,6 +150,20 @@ df_meteofrance <- list.files("02_Data/raw_data/09_Climatic_Data/09_Montpellier_S
 write.csv(df_meteofrance,"02_Data/processed_data/09_Climatic_Data/meteo_macro_synop.csv",row.names = F)
 
 
+#### Amotspheric pressure data from : Meteo France: https://donneespubliques.meteofrance.fr/
+df_meteofrance_pression <- list.files("02_Data/raw_data/09_Climatic_Data/09_Montpellier_SYNOP/09_Montpellier_SYNOP_Data/09_SYNOP_Data", full.names = T) %>%
+  purrr::map_dfr(.,~read.csv(., sep = ";", stringsAsFactors = F, na.strings = "mq")) %>%
+  filter(numer_sta == 07643) %>% # code station meteo montpellier
+  mutate(date = parse_date_time(date,"ymdHMS")) %>%
+  mutate(jour = as_date(date)) %>%
+  mutate(temp = t - 273.15) %>%
+  group_by(date) %>%
+  summarise(patm=pres, pmer=pmer)  
+
+write.csv(df_meteofrance_pression,"02_Data/processed_data/meteo_pression_synop.csv",row.names = F)
+
+
+
 #### Departmental meteorological data from ODEE: https://odee.herault.fr/index.php/component/phocadownload/category/36-climatologie?download=5054:donnees-climato-dept34
 
 df_meteo_dpt <- read.csv('02_Data/raw_data/09_Climatic_Data/09_Montpellier_ODEE/09_Montpellier_ODEE_Data/Station_202_20210526_H.csv', sep = ";",stringsAsFactors = F, na.strings = "", dec = ",", col.names = c('date',"heure","precipitations","temp")) %>% ## selection of station of Chateau d'o in Montpellier
